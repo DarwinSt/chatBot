@@ -15,10 +15,14 @@ public class TelegramMessageSender {
     }
 
     public void sendText(String chatId, String text) {
+        sendText(chatId, text, null);
+    }
+
+    public void sendText(String chatId, String text, Object replyMarkup) {
         if (text == null) {
             return;
         }
         String trimmed = text.length() > 4000 ? text.substring(0, 3997) + "..." : text;
-        telegramApiClient.sendMessage(chatId, trimmed);
+        telegramApiClient.sendMessage(chatId, trimmed, replyMarkup);
     }
 }

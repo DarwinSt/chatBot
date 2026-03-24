@@ -1,5 +1,7 @@
 package com.financebot.service.telegram;
 
+import com.financebot.dto.request.AccountCreateRequest;
+import com.financebot.dto.request.CreditCardCreateRequest;
 import com.financebot.dto.request.CreditCardPaymentRequest;
 import com.financebot.dto.request.DebtCreateRequest;
 import com.financebot.dto.request.DebtPaymentRequest;
@@ -11,6 +13,7 @@ import com.financebot.dto.response.CategoryRefResponse;
 import com.financebot.dto.response.CreditCardResponse;
 import com.financebot.dto.response.DebtResponse;
 import com.financebot.entity.TelegramChatSession;
+import com.financebot.enums.AccountType;
 import com.financebot.enums.CategoryType;
 import com.financebot.enums.TelegramConversationState;
 import com.financebot.exception.BusinessRuleException;
@@ -32,7 +35,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
+import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_ACCOUNT_CREATE;
+import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_ACCOUNT_DELETE;
+import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_ACCOUNT_EDIT;
+import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_CREATE;
+import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_DELETE;
+import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_EDIT;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_CONSUMPTION;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_PAYMENT;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_DEBT_PAYMENT;
@@ -43,23 +53,32 @@ import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_TRANS
 import static com.financebot.service.telegram.TelegramDialogConstants.MODE_ACCOUNT;
 import static com.financebot.service.telegram.TelegramDialogConstants.MODE_CARD;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_ACCOUNT;
+import static com.financebot.service.telegram.TelegramDialogConstants.STEP_ACCOUNT_TYPE;
+import static com.financebot.service.telegram.TelegramDialogConstants.STEP_ACTIVE;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_AMOUNT;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_CARD;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_CATEGORY;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_CREDITOR;
+import static com.financebot.service.telegram.TelegramDialogConstants.STEP_CUTOFF;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_DATE;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_DEBT;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_DEBT_CATEGORY;
+import static com.financebot.service.telegram.TelegramDialogConstants.STEP_CONFIRM;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_DESCRIPTION;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_DESTINATION;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_DUE;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_NAME;
+import static com.financebot.service.telegram.TelegramDialogConstants.STEP_INITIAL_BALANCE;
+import static com.financebot.service.telegram.TelegramDialogConstants.STEP_LIMIT;
+import static com.financebot.service.telegram.TelegramDialogConstants.STEP_NOTES;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_ORIGIN;
+import static com.financebot.service.telegram.TelegramDialogConstants.STEP_PAYMENT_DUE;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_PAYMENT_MODE;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_PENDING;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_SOURCE;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_TARGET;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_TOTAL;
+import static com.financebot.service.telegram.TelegramDialogConstants.STEP_USED;
 
 @Service
 public class TelegramConversationService {
@@ -106,6 +125,12 @@ public class TelegramConversationService {
         String input = rawInput.trim();
         try {
             switch (ctx.flow) {
+                case FLOW_ACCOUNT_CREATE -> handleAccountCreate(chatId, session, ctx, input);
+                case FLOW_CARD_CREATE -> handleCardCreateWizard(chatId, session, ctx, input);
+                case FLOW_ACCOUNT_EDIT -> handleAccountEdit(chatId, session, ctx, input);
+                case FLOW_ACCOUNT_DELETE -> handleAccountDelete(chatId, session, ctx, input);
+                case FLOW_CARD_EDIT -> handleCardEdit(chatId, session, ctx, input);
+                case FLOW_CARD_DELETE -> handleCardDelete(chatId, session, ctx, input);
                 case FLOW_EXPENSE -> handleExpense(chatId, session, ctx, input);
                 case FLOW_INCOME -> handleIncome(chatId, session, ctx, input);
                 case FLOW_DEBT_REGISTER -> handleDebtRegister(chatId, session, ctx, input);
@@ -135,7 +160,7 @@ public class TelegramConversationService {
         ctx.flow = FLOW_EXPENSE;
         ctx.step = STEP_AMOUNT;
         sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
-        messageSender.sendText(chatId, "Monto del gasto (ej: 25.50):");
+        messageSender.sendText(chatId, "Paso 1/4 - Monto del gasto (ej: 25.50):");
     }
 
     @Transactional
@@ -228,6 +253,479 @@ public class TelegramConversationService {
         messageSender.sendText(chatId, "Cuenta origen (número):\n" + formatAccounts(accountService.listActive()));
     }
 
+    @Transactional
+    public void beginAccountCreateFlow(String chatId, TelegramChatSession session, String pendingCommand) {
+        TelegramContextPayload ctx = new TelegramContextPayload();
+        ctx.flow = FLOW_ACCOUNT_CREATE;
+        ctx.step = STEP_NAME;
+        sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
+        messageSender.sendText(chatId, """
+                Crear cuenta - Paso 1/4
+                Escribe el nombre de la cuenta:
+                """.trim());
+    }
+
+    @Transactional
+    public void beginCardCreateFlow(String chatId, TelegramChatSession session, String pendingCommand) {
+        TelegramContextPayload ctx = new TelegramContextPayload();
+        ctx.flow = FLOW_CARD_CREATE;
+        ctx.step = STEP_NAME;
+        sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
+        messageSender.sendText(chatId, """
+                Crear tarjeta - Paso 1/6
+                Escribe el nombre de la tarjeta:
+                """.trim());
+    }
+
+    @Transactional
+    public void beginAccountEditFlow(String chatId, TelegramChatSession session, String pendingCommand) {
+        List<AccountResponse> accounts = accountService.listAll();
+        if (accounts.isEmpty()) {
+            messageSender.sendText(chatId, "No hay cuentas para editar.");
+            return;
+        }
+        TelegramContextPayload ctx = new TelegramContextPayload();
+        ctx.flow = FLOW_ACCOUNT_EDIT;
+        ctx.step = STEP_ACCOUNT;
+        sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
+        messageSender.sendText(chatId, "Editar cuenta - Paso 1/5\nElige la cuenta por número:\n" + formatAccounts(accounts));
+    }
+
+    @Transactional
+    public void beginAccountDeleteFlow(String chatId, TelegramChatSession session, String pendingCommand) {
+        List<AccountResponse> accounts = accountService.listAll();
+        if (accounts.isEmpty()) {
+            messageSender.sendText(chatId, "No hay cuentas para eliminar.");
+            return;
+        }
+        TelegramContextPayload ctx = new TelegramContextPayload();
+        ctx.flow = FLOW_ACCOUNT_DELETE;
+        ctx.step = STEP_ACCOUNT;
+        sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
+        messageSender.sendText(chatId, "Eliminar cuenta - Paso 1/2\nElige la cuenta por número:\n" + formatAccounts(accounts));
+    }
+
+    @Transactional
+    public void beginCardEditFlow(String chatId, TelegramChatSession session, String pendingCommand) {
+        List<CreditCardResponse> cards = creditCardService.listAll();
+        if (cards.isEmpty()) {
+            messageSender.sendText(chatId, "No hay tarjetas para editar.");
+            return;
+        }
+        TelegramContextPayload ctx = new TelegramContextPayload();
+        ctx.flow = FLOW_CARD_EDIT;
+        ctx.step = STEP_CARD;
+        sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
+        messageSender.sendText(chatId, "Editar tarjeta - Paso 1/7\nElige la tarjeta por número:\n" + formatCards(cards));
+    }
+
+    @Transactional
+    public void beginCardDeleteFlow(String chatId, TelegramChatSession session, String pendingCommand) {
+        List<CreditCardResponse> cards = creditCardService.listAll();
+        if (cards.isEmpty()) {
+            messageSender.sendText(chatId, "No hay tarjetas para eliminar.");
+            return;
+        }
+        TelegramContextPayload ctx = new TelegramContextPayload();
+        ctx.flow = FLOW_CARD_DELETE;
+        ctx.step = STEP_CARD;
+        sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
+        messageSender.sendText(chatId, "Eliminar tarjeta - Paso 1/2\nElige la tarjeta por número:\n" + formatCards(cards));
+    }
+
+    private void handleAccountCreate(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
+        switch (ctx.step) {
+            case STEP_NAME -> {
+                if (input.isBlank()) {
+                    messageSender.sendText(chatId, "El nombre no puede estar vacío.");
+                    return;
+                }
+                ctx.fields.put("name", input.trim());
+                ctx.step = STEP_ACCOUNT_TYPE;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, """
+                        Crear cuenta - Paso 2/4
+                        Tipo de cuenta:
+                        1) CHECKING
+                        2) SAVINGS
+                        3) CASH
+                        4) DIGITAL_WALLET
+                        """.trim());
+            }
+            case STEP_ACCOUNT_TYPE -> {
+                AccountType type = parseAccountType(input);
+                if (type == null) {
+                    messageSender.sendText(chatId, "Tipo inválido. Responde 1-4 o nombre del tipo.");
+                    return;
+                }
+                ctx.fields.put("type", type.name());
+                ctx.step = STEP_INITIAL_BALANCE;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Crear cuenta - Paso 3/4\nSaldo inicial (ej: 1500.00):");
+            }
+            case STEP_INITIAL_BALANCE -> {
+                var amount = TelegramParsingUtils.parseAmount(input);
+                if (amount.isEmpty()) {
+                    messageSender.sendText(chatId, "Monto inválido.");
+                    return;
+                }
+                ctx.fields.put("initialBalance", amount.get().toPlainString());
+                ctx.step = STEP_NOTES;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Crear cuenta - Paso 4/4\nNotas (o '-' para omitir):");
+            }
+            case STEP_NOTES -> {
+                String notes = "-".equals(input) ? null : input.trim();
+                accountService.create(new AccountCreateRequest(
+                        ctx.fields.get("name"),
+                        AccountType.valueOf(ctx.fields.get("type")),
+                        new BigDecimal(ctx.fields.get("initialBalance")),
+                        notes,
+                        true
+                ));
+                sessionService.resetToIdle(session);
+                messageSender.sendText(chatId, "Cuenta creada correctamente.");
+            }
+            default -> resetUnknown(chatId, session);
+        }
+    }
+
+    private void handleCardCreateWizard(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
+        switch (ctx.step) {
+            case STEP_NAME -> {
+                if (input.isBlank()) {
+                    messageSender.sendText(chatId, "El nombre no puede estar vacío.");
+                    return;
+                }
+                ctx.fields.put("name", input.trim());
+                ctx.step = STEP_LIMIT;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Crear tarjeta - Paso 2/6\nCupo total (ej: 5000):");
+            }
+            case STEP_LIMIT -> {
+                var totalLimit = TelegramParsingUtils.parseAmount(input);
+                if (totalLimit.isEmpty()) {
+                    messageSender.sendText(chatId, "Monto inválido para cupo total.");
+                    return;
+                }
+                ctx.fields.put("totalLimit", totalLimit.get().toPlainString());
+                ctx.step = STEP_USED;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Crear tarjeta - Paso 3/6\nMonto usado actual (ej: 0):");
+            }
+            case STEP_USED -> {
+                var used = TelegramParsingUtils.parseAmount(input);
+                if (used.isEmpty()) {
+                    messageSender.sendText(chatId, "Monto inválido para usado.");
+                    return;
+                }
+                ctx.fields.put("usedAmount", used.get().toPlainString());
+                ctx.step = STEP_CUTOFF;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Crear tarjeta - Paso 4/6\nDía de corte (1-31) o '-' para omitir:");
+            }
+            case STEP_CUTOFF -> {
+                Short cutoff = parseDayOrNull(input);
+                if (!"-".equals(input.trim()) && cutoff == null) {
+                    messageSender.sendText(chatId, "Día de corte inválido. Usa 1-31 o '-'.");
+                    return;
+                }
+                if (cutoff != null) {
+                    ctx.fields.put("cutoff", cutoff.toString());
+                }
+                ctx.step = STEP_PAYMENT_DUE;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Crear tarjeta - Paso 5/6\nDía de vencimiento (1-31) o '-' para omitir:");
+            }
+            case STEP_PAYMENT_DUE -> {
+                Short due = parseDayOrNull(input);
+                if (!"-".equals(input.trim()) && due == null) {
+                    messageSender.sendText(chatId, "Día de vencimiento inválido. Usa 1-31 o '-'.");
+                    return;
+                }
+                if (due != null) {
+                    ctx.fields.put("due", due.toString());
+                }
+                ctx.step = STEP_NOTES;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Crear tarjeta - Paso 6/6\nNotas (o '-' para omitir):");
+            }
+            case STEP_NOTES -> {
+                String notes = "-".equals(input.trim()) ? null : input.trim();
+                creditCardService.create(new CreditCardCreateRequest(
+                        ctx.fields.get("name"),
+                        new BigDecimal(ctx.fields.get("totalLimit")),
+                        new BigDecimal(ctx.fields.get("usedAmount")),
+                        ctx.fields.containsKey("cutoff") ? Short.parseShort(ctx.fields.get("cutoff")) : null,
+                        ctx.fields.containsKey("due") ? Short.parseShort(ctx.fields.get("due")) : null,
+                        notes
+                ));
+                sessionService.resetToIdle(session);
+                messageSender.sendText(chatId, "Tarjeta creada correctamente.");
+            }
+            default -> resetUnknown(chatId, session);
+        }
+    }
+
+    private void handleAccountEdit(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
+        switch (ctx.step) {
+            case STEP_ACCOUNT -> {
+                List<AccountResponse> accounts = accountService.listAll();
+                var idx = TelegramParsingUtils.parsePositiveInt(input);
+                if (idx.isEmpty() || idx.get() > accounts.size()) {
+                    messageSender.sendText(chatId, "Número inválido.");
+                    return;
+                }
+                AccountResponse selected = accounts.get(idx.get() - 1);
+                ctx.fields.put("accountId", String.valueOf(selected.id()));
+                ctx.fields.put("name", selected.name());
+                ctx.fields.put("type", selected.type().name());
+                ctx.fields.put("notes", selected.notes() == null ? "" : selected.notes());
+                ctx.fields.put("active", String.valueOf(selected.active()));
+                ctx.step = STEP_NAME;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Paso 2/5 - Nuevo nombre (o '-' para mantener):");
+            }
+            case STEP_NAME -> {
+                if (!"-".equals(input.trim())) {
+                    ctx.fields.put("name", input.trim());
+                }
+                ctx.step = STEP_ACCOUNT_TYPE;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, """
+                        Paso 3/5 - Tipo (1-4) o '-' para mantener:
+                        1) CHECKING
+                        2) SAVINGS
+                        3) CASH
+                        4) DIGITAL_WALLET
+                        """.trim());
+            }
+            case STEP_ACCOUNT_TYPE -> {
+                if (!"-".equals(input.trim())) {
+                    AccountType type = parseAccountType(input);
+                    if (type == null) {
+                        messageSender.sendText(chatId, "Tipo inválido. Usa 1-4 o '-'.");
+                        return;
+                    }
+                    ctx.fields.put("type", type.name());
+                }
+                ctx.step = STEP_ACTIVE;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Paso 4/5 - Activa? (SI/NO o '-' para mantener):");
+            }
+            case STEP_ACTIVE -> {
+                String t = input.trim().toUpperCase(Locale.ROOT);
+                if (!"-".equals(t)) {
+                    if ("SI".equals(t) || "S".equals(t) || "1".equals(t) || "TRUE".equals(t)) {
+                        ctx.fields.put("active", "true");
+                    } else if ("NO".equals(t) || "N".equals(t) || "0".equals(t) || "FALSE".equals(t)) {
+                        ctx.fields.put("active", "false");
+                    } else {
+                        messageSender.sendText(chatId, "Valor inválido. Responde SI/NO o '-'.");
+                        return;
+                    }
+                }
+                ctx.step = STEP_NOTES;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Paso 5/5 - Notas (o '-' para mantener):");
+            }
+            case STEP_NOTES -> {
+                if (!"-".equals(input.trim())) {
+                    ctx.fields.put("notes", input.trim());
+                }
+                accountService.updateBasic(
+                        Long.parseLong(ctx.fields.get("accountId")),
+                        ctx.fields.get("name"),
+                        AccountType.valueOf(ctx.fields.get("type")),
+                        ctx.fields.get("notes").isBlank() ? null : ctx.fields.get("notes"),
+                        Boolean.parseBoolean(ctx.fields.get("active"))
+                );
+                sessionService.resetToIdle(session);
+                messageSender.sendText(chatId, "Cuenta actualizada correctamente.");
+            }
+            default -> resetUnknown(chatId, session);
+        }
+    }
+
+    private void handleAccountDelete(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
+        switch (ctx.step) {
+            case STEP_ACCOUNT -> {
+                List<AccountResponse> accounts = accountService.listAll();
+                var idx = TelegramParsingUtils.parsePositiveInt(input);
+                if (idx.isEmpty() || idx.get() > accounts.size()) {
+                    messageSender.sendText(chatId, "Número inválido.");
+                    return;
+                }
+                AccountResponse selected = accounts.get(idx.get() - 1);
+                ctx.fields.put("accountId", String.valueOf(selected.id()));
+                ctx.step = STEP_CONFIRM;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Confirmar eliminación lógica de cuenta '" + selected.name() + "'? (SI/NO)");
+            }
+            case STEP_CONFIRM -> {
+                String t = input.trim().toUpperCase(Locale.ROOT);
+                if ("SI".equals(t) || "S".equals(t)) {
+                    accountService.deactivate(Long.parseLong(ctx.fields.get("accountId")));
+                    sessionService.resetToIdle(session);
+                    messageSender.sendText(chatId, "Cuenta desactivada correctamente.");
+                } else if ("NO".equals(t) || "N".equals(t)) {
+                    sessionService.resetToIdle(session);
+                    messageSender.sendText(chatId, "Operación cancelada.");
+                } else {
+                    messageSender.sendText(chatId, "Responde SI o NO.");
+                }
+            }
+            default -> resetUnknown(chatId, session);
+        }
+    }
+
+    private void handleCardEdit(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
+        switch (ctx.step) {
+            case STEP_CARD -> {
+                List<CreditCardResponse> cards = creditCardService.listAll();
+                var idx = TelegramParsingUtils.parsePositiveInt(input);
+                if (idx.isEmpty() || idx.get() > cards.size()) {
+                    messageSender.sendText(chatId, "Número inválido.");
+                    return;
+                }
+                CreditCardResponse selected = cards.get(idx.get() - 1);
+                ctx.fields.put("cardId", String.valueOf(selected.id()));
+                ctx.fields.put("name", selected.name());
+                ctx.fields.put("totalLimit", selected.totalLimit().toPlainString());
+                ctx.fields.put("cutoff", selected.statementCutoffDay() == null ? "" : selected.statementCutoffDay().toString());
+                ctx.fields.put("due", selected.paymentDueDay() == null ? "" : selected.paymentDueDay().toString());
+                ctx.fields.put("active", String.valueOf(selected.active()));
+                ctx.fields.put("notes", selected.notes() == null ? "" : selected.notes());
+                ctx.step = STEP_NAME;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Paso 2/7 - Nuevo nombre (o '-' para mantener):");
+            }
+            case STEP_NAME -> {
+                if (!"-".equals(input.trim())) {
+                    ctx.fields.put("name", input.trim());
+                }
+                ctx.step = STEP_LIMIT;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Paso 3/7 - Nuevo cupo total (o '-' para mantener):");
+            }
+            case STEP_LIMIT -> {
+                if (!"-".equals(input.trim())) {
+                    var amount = TelegramParsingUtils.parseAmount(input);
+                    if (amount.isEmpty()) {
+                        messageSender.sendText(chatId, "Cupo inválido.");
+                        return;
+                    }
+                    ctx.fields.put("totalLimit", amount.get().toPlainString());
+                }
+                ctx.step = STEP_CUTOFF;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Paso 4/7 - Día de corte (1-31, '-' mantener, '0' limpiar):");
+            }
+            case STEP_CUTOFF -> {
+                String t = input.trim();
+                if (!"-".equals(t)) {
+                    if ("0".equals(t)) {
+                        ctx.fields.put("cutoff", "");
+                    } else {
+                        Short day = parseDayOrNull(t);
+                        if (day == null) {
+                            messageSender.sendText(chatId, "Día de corte inválido.");
+                            return;
+                        }
+                        ctx.fields.put("cutoff", day.toString());
+                    }
+                }
+                ctx.step = STEP_PAYMENT_DUE;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Paso 5/7 - Día de vencimiento (1-31, '-' mantener, '0' limpiar):");
+            }
+            case STEP_PAYMENT_DUE -> {
+                String t = input.trim();
+                if (!"-".equals(t)) {
+                    if ("0".equals(t)) {
+                        ctx.fields.put("due", "");
+                    } else {
+                        Short day = parseDayOrNull(t);
+                        if (day == null) {
+                            messageSender.sendText(chatId, "Día de vencimiento inválido.");
+                            return;
+                        }
+                        ctx.fields.put("due", day.toString());
+                    }
+                }
+                ctx.step = STEP_ACTIVE;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Paso 6/7 - Activa? (SI/NO o '-' para mantener):");
+            }
+            case STEP_ACTIVE -> {
+                String t = input.trim().toUpperCase(Locale.ROOT);
+                if (!"-".equals(t)) {
+                    if ("SI".equals(t) || "S".equals(t) || "1".equals(t) || "TRUE".equals(t)) {
+                        ctx.fields.put("active", "true");
+                    } else if ("NO".equals(t) || "N".equals(t) || "0".equals(t) || "FALSE".equals(t)) {
+                        ctx.fields.put("active", "false");
+                    } else {
+                        messageSender.sendText(chatId, "Valor inválido. Responde SI/NO o '-'.");
+                        return;
+                    }
+                }
+                ctx.step = STEP_NOTES;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Paso 7/7 - Notas (o '-' para mantener, '0' limpiar):");
+            }
+            case STEP_NOTES -> {
+                String t = input.trim();
+                if (!"-".equals(t)) {
+                    ctx.fields.put("notes", "0".equals(t) ? "" : t);
+                }
+                creditCardService.updateBasic(
+                        Long.parseLong(ctx.fields.get("cardId")),
+                        ctx.fields.get("name"),
+                        new BigDecimal(ctx.fields.get("totalLimit")),
+                        ctx.fields.get("cutoff").isBlank() ? null : Short.parseShort(ctx.fields.get("cutoff")),
+                        ctx.fields.get("due").isBlank() ? null : Short.parseShort(ctx.fields.get("due")),
+                        ctx.fields.get("notes").isBlank() ? null : ctx.fields.get("notes"),
+                        Boolean.parseBoolean(ctx.fields.get("active"))
+                );
+                sessionService.resetToIdle(session);
+                messageSender.sendText(chatId, "Tarjeta actualizada correctamente.");
+            }
+            default -> resetUnknown(chatId, session);
+        }
+    }
+
+    private void handleCardDelete(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
+        switch (ctx.step) {
+            case STEP_CARD -> {
+                List<CreditCardResponse> cards = creditCardService.listAll();
+                var idx = TelegramParsingUtils.parsePositiveInt(input);
+                if (idx.isEmpty() || idx.get() > cards.size()) {
+                    messageSender.sendText(chatId, "Número inválido.");
+                    return;
+                }
+                CreditCardResponse selected = cards.get(idx.get() - 1);
+                ctx.fields.put("cardId", String.valueOf(selected.id()));
+                ctx.step = STEP_CONFIRM;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Confirmar eliminación lógica de tarjeta '" + selected.name() + "'? (SI/NO)");
+            }
+            case STEP_CONFIRM -> {
+                String t = input.trim().toUpperCase(Locale.ROOT);
+                if ("SI".equals(t) || "S".equals(t)) {
+                    creditCardService.deactivate(Long.parseLong(ctx.fields.get("cardId")));
+                    sessionService.resetToIdle(session);
+                    messageSender.sendText(chatId, "Tarjeta desactivada correctamente.");
+                } else if ("NO".equals(t) || "N".equals(t)) {
+                    sessionService.resetToIdle(session);
+                    messageSender.sendText(chatId, "Operación cancelada.");
+                } else {
+                    messageSender.sendText(chatId, "Responde SI o NO.");
+                }
+            }
+            default -> resetUnknown(chatId, session);
+        }
+    }
+
     private void handleExpense(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
         switch (ctx.step) {
             case STEP_AMOUNT -> {
@@ -239,32 +737,25 @@ public class TelegramConversationService {
                 ctx.fields.put("amount", amt.get().toPlainString());
                 ctx.step = STEP_CATEGORY;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Categoría (número):\n" + formatCategories(categoryService.listActiveByType(CategoryType.EXPENSE)));
+                messageSender.sendText(
+                        chatId,
+                        "Paso 2/4 - Elige categoría:",
+                        buildExpenseCategoriesKeyboard(categoryService.listActiveByType(CategoryType.EXPENSE))
+                );
             }
             case STEP_CATEGORY -> {
                 List<CategoryRefResponse> cats = categoryService.listActiveByType(CategoryType.EXPENSE);
-                var idx = TelegramParsingUtils.parsePositiveInt(input);
-                if (idx.isEmpty() || idx.get() > cats.size()) {
-                    messageSender.sendText(chatId, "Número inválido.");
+                Long categoryId = parseExpenseCategoryInput(input, cats);
+                if (categoryId == null) {
+                    messageSender.sendText(chatId, "Categoría inválida. Usa los botones o un número válido.");
                     return;
                 }
-                ctx.fields.put("categoryId", String.valueOf(cats.get(idx.get() - 1).id()));
+                ctx.fields.put("categoryId", String.valueOf(categoryId));
                 ctx.step = STEP_DATE;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Fecha del gasto (yyyy-MM-dd):");
+                messageSender.sendText(chatId, "Paso 3/4 - ¿Pago desde cuenta o tarjeta? Escribe 1=cuenta, 2=tarjeta.");
             }
             case STEP_DATE -> {
-                var d = TelegramParsingUtils.parseIsoDate(input);
-                if (d.isEmpty()) {
-                    messageSender.sendText(chatId, "Fecha inválida. Formato yyyy-MM-dd.");
-                    return;
-                }
-                ctx.fields.put("date", d.get().toString());
-                ctx.step = STEP_PAYMENT_MODE;
-                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "¿Pago desde cuenta o tarjeta? Escribe 1=cuenta, 2=tarjeta.");
-            }
-            case STEP_PAYMENT_MODE -> {
                 String mode = parsePaymentMode(input);
                 if (mode == null) {
                     messageSender.sendText(chatId, "Responde 1 o 2.");
@@ -296,12 +787,41 @@ public class TelegramConversationService {
                 messageSender.sendText(chatId, "Descripción opcional (o '-' para omitir):");
             }
             case STEP_DESCRIPTION -> {
+                if (input.startsWith("cb:exp_confirm:")) {
+                    handleExpenseConfirmationCallback(chatId, session, ctx, input);
+                    return;
+                }
                 String notes = "-".equals(input) ? null : input;
+                ctx.fields.put("notes", notes == null ? "" : notes);
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(
+                        chatId,
+                        buildExpenseConfirmationText(ctx),
+                        buildExpenseConfirmKeyboard()
+                );
+            }
+            default -> resetUnknown(chatId, session);
+        }
+    }
+
+    private void handleExpenseConfirmationCallback(
+            String chatId,
+            TelegramChatSession session,
+            TelegramContextPayload ctx,
+            String input
+    ) {
+        String action = input.substring("cb:exp_confirm:".length());
+        switch (action) {
+            case "ok" -> {
                 BigDecimal amount = new BigDecimal(ctx.fields.get("amount"));
-                LocalDate date = LocalDate.parse(ctx.fields.get("date"));
+                LocalDate date = LocalDate.now();
                 long categoryId = Long.parseLong(ctx.fields.get("categoryId"));
                 Long accountId = ctx.fields.containsKey("accountId") ? Long.parseLong(ctx.fields.get("accountId")) : null;
                 Long cardId = ctx.fields.containsKey("cardId") ? Long.parseLong(ctx.fields.get("cardId")) : null;
+                String notes = ctx.fields.get("notes");
+                if (notes != null && notes.isBlank()) {
+                    notes = null;
+                }
                 expenseService.create(new ExpenseCreateRequest(
                         amount,
                         date,
@@ -309,12 +829,95 @@ public class TelegramConversationService {
                         notes,
                         categoryId,
                         accountId,
-                        cardId));
+                        cardId
+                ));
                 sessionService.resetToIdle(session);
                 messageSender.sendText(chatId, "Gasto registrado correctamente.");
             }
-            default -> resetUnknown(chatId, session);
+            case "cat" -> {
+                ctx.step = STEP_CATEGORY;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(
+                        chatId,
+                        "Elige una nueva categoría:",
+                        buildExpenseCategoriesKeyboard(categoryService.listActiveByType(CategoryType.EXPENSE))
+                );
+            }
+            case "amt" -> {
+                ctx.step = STEP_AMOUNT;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Ingresa el nuevo monto:");
+            }
+            case "cancel" -> {
+                sessionService.resetToIdle(session);
+                messageSender.sendText(chatId, "Registro cancelado.");
+            }
+            default -> messageSender.sendText(chatId, "Acción no reconocida.");
         }
+    }
+
+    private String buildExpenseConfirmationText(TelegramContextPayload ctx) {
+        String mode = MODE_ACCOUNT.equals(ctx.fields.get("mode")) ? "Cuenta" : "Tarjeta";
+        String target = ctx.fields.get("accountId");
+        if (target == null) {
+            target = ctx.fields.get("cardId");
+        }
+        String notes = ctx.fields.get("notes");
+        if (notes == null || notes.isBlank()) {
+            notes = "(sin descripción)";
+        }
+        return """
+                Paso 4/4 - Confirmar gasto
+                Monto: %s
+                Categoría ID: %s
+                Origen: %s #%s
+                Fecha: %s
+                Notas: %s
+                """.formatted(
+                ctx.fields.get("amount"),
+                ctx.fields.get("categoryId"),
+                mode,
+                target,
+                LocalDate.now(),
+                notes
+        ).trim();
+    }
+
+    private Map<String, Object> buildExpenseConfirmKeyboard() {
+        return Map.of(
+                "inline_keyboard", List.of(
+                        List.of(
+                                Map.of("text", "✅ Confirmar", "callback_data", "cb:exp_confirm:ok"),
+                                Map.of("text", "✏️ Cambiar categoría", "callback_data", "cb:exp_confirm:cat")
+                        ),
+                        List.of(
+                                Map.of("text", "🔁 Cambiar monto", "callback_data", "cb:exp_confirm:amt"),
+                                Map.of("text", "❌ Cancelar", "callback_data", "cb:exp_confirm:cancel")
+                        )
+                )
+        );
+    }
+
+    private Map<String, Object> buildExpenseCategoriesKeyboard(List<CategoryRefResponse> categories) {
+        List<List<Map<String, String>>> rows = categories.stream()
+                .map(c -> List.of(Map.of("text", c.name(), "callback_data", "cb:exp_cat:" + c.id())))
+                .toList();
+        return Map.of("inline_keyboard", rows);
+    }
+
+    private Long parseExpenseCategoryInput(String input, List<CategoryRefResponse> categories) {
+        if (input.startsWith("cb:exp_cat:")) {
+            try {
+                return Long.parseLong(input.substring("cb:exp_cat:".length()));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        var idx = TelegramParsingUtils.parsePositiveInt(input);
+        if (idx.isEmpty() || idx.get() > categories.size()) {
+            return null;
+        }
+        return categories.get(idx.get() - 1).id();
     }
 
     private void handleIncome(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
@@ -735,6 +1338,30 @@ public class TelegramConversationService {
             return MODE_CARD;
         }
         return null;
+    }
+
+    private AccountType parseAccountType(String input) {
+        String t = input.trim().toUpperCase(Locale.ROOT);
+        return switch (t) {
+            case "1", "CHECKING" -> AccountType.CHECKING;
+            case "2", "SAVINGS" -> AccountType.SAVINGS;
+            case "3", "CASH" -> AccountType.CASH;
+            case "4", "DIGITAL_WALLET", "DIGITAL-WALLET", "WALLET" -> AccountType.DIGITAL_WALLET;
+            default -> null;
+        };
+    }
+
+    private Short parseDayOrNull(String input) {
+        String t = input.trim();
+        if ("-".equals(t)) {
+            return null;
+        }
+        try {
+            short day = Short.parseShort(t);
+            return (day >= 1 && day <= 31) ? day : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private Long resolveTargetId(String mode, String input) {

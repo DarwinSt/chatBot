@@ -24,4 +24,16 @@ public interface CreditCardService {
     CreditCardPaymentResponse registerPayment(CreditCardPaymentCreateRequest request);
 
     CreditCardPaymentResponse registerPayment(Long creditCardId, CreditCardPaymentRequest request);
+
+    CreditCardResponse updateBasic(
+            Long id,
+            String name,
+            BigDecimal totalLimit,
+            Short statementCutoffDay,
+            Short paymentDueDay,
+            String notes,
+            boolean active
+    );
+
+    void deactivate(Long id);
 }

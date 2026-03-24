@@ -2,9 +2,29 @@ spring:
   config:
     activate:
       on-profile: prod
+  application:
+    name: financebot
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/financesbot}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
   jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
     show-sql: false
     properties:
       hibernate:
+        format_sql: true
         jdbc:
           time_zone: UTC
+
+server:
+  port: ${SERVER_PORT:8080}
+
+app:
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+  base-url: ${APP_BASE_URL:http://localhost:${SERVER_PORT:8080}}

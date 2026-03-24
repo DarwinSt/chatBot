@@ -7,6 +7,10 @@ import com.financebot.integration.telegram.TelegramMessageSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Orquesta el flujo Telegram → sesión → comandos/conversación → envío de respuesta.
  */
@@ -17,6 +21,7 @@ public class TelegramUpdateService {
     private final TelegramCommandRouter commandRouter;
     private final TelegramConversationService conversationService;
     private final TelegramMessageSender messageSender;
+    private final Map<Long, Long> processedUpdates = new ConcurrentHashMap<>();
 
     public TelegramUpdateService(
             TelegramSessionService sessionService,
@@ -31,7 +36,24 @@ public class TelegramUpdateService {
 
     @Transactional
     public void process(TelegramUpdateDto update) {
-        if (update == null || update.message() == null) {
+        if (update == null) {
+            return;
+        }
+        if (isDuplicateUpdate(update.update_id())) {
+            return;
+        }
+        if (update.callback_query() != null
+                && update.callback_query().message() != null
+                && update.callback_query().message().chat() != null) {
+            String chatId = String.valueOf(update.callback_query().message().chat().id());
+            TelegramChatSession session = sessionService.getOrCreate(chatId);
+            String data = update.callback_query().data();
+            if (data != null && !data.isBlank()) {
+                conversationService.handleUserInput(chatId, session, data);
+            }
+            return;
+        }
+        if (update.message() == null) {
             return;
         }
         String text = update.message().text();
@@ -55,7 +77,25 @@ public class TelegramUpdateService {
         if (latest.getCurrentState() == TelegramConversationState.CONVERSATION) {
             conversationService.handleUserInput(chatId, latest, trimmed);
         } else {
-            messageSender.sendText(chatId, "Escribe /ayuda para ver comandos. Usa / para iniciar.");
+            messageSender.sendText(chatId, "Te muestro el menú para que elijas una opción:");
+            commandRouter.sendMainMenu(chatId);
         }
+    }
+
+    private boolean isDuplicateUpdate(Long updateId) {
+        if (updateId == null) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        long ttlMs = 5 * 60 * 1000L;
+        Iterator<Map.Entry<Long, Long>> it = processedUpdates.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Long, Long> e = it.next();
+            if (now - e.getValue() > ttlMs) {
+                it.remove();
+            }
+        }
+        Long previous = processedUpdates.putIfAbsent(updateId, now);
+        return previous != null;
     }
 }

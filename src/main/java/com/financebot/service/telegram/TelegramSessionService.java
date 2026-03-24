@@ -23,13 +23,22 @@ public class TelegramSessionService {
 
     @Transactional
     public TelegramChatSession getOrCreate(String chatId) {
-        return repository.findByChatId(chatId).orElseGet(() -> {
+        Long chatIdValue = parseChatId(chatId);
+        return repository.findByChatId(chatIdValue).orElseGet(() -> {
             TelegramChatSession session = new TelegramChatSession();
-            session.setChatId(chatId);
+            session.setChatId(chatIdValue);
             session.setCurrentState(TelegramConversationState.IDLE);
             session.setActive(true);
             return repository.save(session);
         });
+    }
+
+    private Long parseChatId(String chatId) {
+        try {
+            return Long.valueOf(chatId);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("chatId inválido para persistencia: " + chatId, e);
+        }
     }
 
     public TelegramContextPayload readPayload(TelegramChatSession session) {

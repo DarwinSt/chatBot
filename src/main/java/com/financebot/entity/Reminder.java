@@ -11,8 +11,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "reminders")
@@ -23,17 +25,18 @@ public class Reminder extends AuditableEntity {
     private Long id;
 
     @NotBlank
-    @Column(name = "title", nullable = false, length = 120)
+    @Column(name = "title", nullable = false, length = 150)
     private String title;
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "reminder_type", nullable = false, length = 40)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "reminder_type", nullable = false, columnDefinition = "reminder_type")
     private ReminderType reminderType;
 
     @NotNull
     @Column(name = "reminder_date", nullable = false)
-    private LocalDateTime reminderDate;
+    private LocalDate reminderDate;
 
     @Column(name = "active", nullable = false)
     private boolean active = true;
@@ -61,11 +64,11 @@ public class Reminder extends AuditableEntity {
         this.reminderType = reminderType;
     }
 
-    public LocalDateTime getReminderDate() {
+    public LocalDate getReminderDate() {
         return reminderDate;
     }
 
-    public void setReminderDate(LocalDateTime reminderDate) {
+    public void setReminderDate(LocalDate reminderDate) {
         this.reminderDate = reminderDate;
     }
 

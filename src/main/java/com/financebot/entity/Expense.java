@@ -13,6 +13,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -38,7 +40,8 @@ public class Expense extends AuditableEntity {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "expense_type", nullable = false, length = 20)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "expense_type", nullable = false, columnDefinition = "expense_type")
     private ExpenseType expenseType;
 
     @NotNull

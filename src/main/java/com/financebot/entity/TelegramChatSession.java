@@ -9,8 +9,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "telegram_chat_sessions")
@@ -20,13 +21,14 @@ public class TelegramChatSession extends AuditableEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank
-    @Column(name = "chat_id", nullable = false, unique = true, length = 100)
-    private String chatId;
+    @NotNull
+    @Column(name = "chat_id", nullable = false, unique = true)
+    private Long chatId;
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "current_state", nullable = false, length = 40)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "current_state", nullable = false, columnDefinition = "telegram_conversation_state")
     private TelegramConversationState currentState;
 
     @Column(name = "pending_command", length = 100)
@@ -42,11 +44,11 @@ public class TelegramChatSession extends AuditableEntity {
         return id;
     }
 
-    public String getChatId() {
+    public Long getChatId() {
         return chatId;
     }
 
-    public void setChatId(String chatId) {
+    public void setChatId(Long chatId) {
         this.chatId = chatId;
     }
 

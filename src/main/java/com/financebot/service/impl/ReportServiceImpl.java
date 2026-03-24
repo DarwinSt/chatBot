@@ -242,11 +242,9 @@ public class ReportServiceImpl implements ReportService {
 
     private List<DueEventResponse> buildUpcomingDueEvents(LocalDate today) {
         LocalDate monthEnd = today.withDayOfMonth(today.lengthOfMonth());
-        LocalDateTime start = today.atStartOfDay();
-        LocalDateTime end = monthEnd.atTime(23, 59, 59);
 
         List<Reminder> reminders =
-                reminderRepository.findByActiveTrueAndReminderDateBetweenOrderByReminderDateAsc(start, end);
+                reminderRepository.findByActiveTrueAndReminderDateBetweenOrderByReminderDateAsc(today, monthEnd);
 
         List<Debt> debts = debtRepository.findUpcomingByDueDateBetween(
                 List.of(DebtStatus.ACTIVE, DebtStatus.OVERDUE),
@@ -259,7 +257,7 @@ public class ReportServiceImpl implements ReportService {
                     DueEventKind.REMINDER,
                     r.getId(),
                     r.getTitle(),
-                    r.getReminderDate(),
+                    r.getReminderDate() != null ? r.getReminderDate().atStartOfDay() : null,
                     null,
                     r.getNotes()));
         }

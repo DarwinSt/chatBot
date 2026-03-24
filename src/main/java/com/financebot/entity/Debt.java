@@ -14,6 +14,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,7 +29,7 @@ public class Debt extends AuditableEntity {
     private Long id;
 
     @NotBlank
-    @Column(name = "name", nullable = false, length = 120)
+    @Column(name = "name", nullable = false, length = 150)
     private String name;
 
     @NotNull
@@ -45,7 +47,7 @@ public class Debt extends AuditableEntity {
     @Column(name = "due_date")
     private LocalDate dueDate;
 
-    @Column(name = "creditor", length = 120)
+    @Column(name = "creditor", length = 150)
     private String creditor;
 
     @Column(name = "notes", length = 500)
@@ -53,7 +55,8 @@ public class Debt extends AuditableEntity {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status", nullable = false, columnDefinition = "debt_status")
     private DebtStatus status;
 
     @ManyToOne(fetch = FetchType.LAZY)

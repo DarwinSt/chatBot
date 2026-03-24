@@ -1,13 +1,15 @@
 package com.financebot.integration.telegram;
 
 import com.financebot.config.TelegramProperties;
-import com.financebot.dto.telegram.TelegramSendMessageRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
+
+import java.util.Map;
 
 /**
  * Cliente HTTP mínimo para la Bot API de Telegram ({@code sendMessage}).
@@ -35,17 +37,33 @@ public class TelegramApiClient {
     }
 
     public void sendMessage(String chatId, String text) {
+        sendMessage(chatId, text, null);
+    }
+
+    public void sendMessage(String chatId, String text, Object replyMarkup) {
         if (restClient == null) {
-            log.debug("Omitiendo sendMessage (cliente no configurado): {}", text);
+            log.warn("Omitiendo sendMessage: TELEGRAM_BOT_TOKEN no configurado. chatId={}, text={}", chatId, text);
             return;
         }
         try {
+            Map<String, Object> payload = new java.util.LinkedHashMap<>();
+            payload.put("chat_id", chatId);
+            payload.put("text", text);
+            if (replyMarkup != null) {
+                payload.put("reply_markup", replyMarkup);
+            }
             restClient.post()
                     .uri("sendMessage")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(new TelegramSendMessageRequest(chatId, text))
+                    .body(payload)
                     .retrieve()
                     .toBodilessEntity();
+        } catch (RestClientResponseException ex) {
+            log.error(
+                    "Telegram API respondió error en sendMessage. status={}, body={}",
+                    ex.getStatusCode(),
+                    ex.getResponseBodyAsString()
+            );
         } catch (RestClientException ex) {
             log.error("Error al llamar a Telegram sendMessage: {}", ex.getMessage());
         }

@@ -160,4 +160,41 @@ public class CreditCardServiceImpl implements CreditCardService {
         );
         return registerPayment(full);
     }
+
+    @Override
+    @Transactional
+    public CreditCardResponse updateBasic(
+            Long id,
+            String name,
+            BigDecimal totalLimit,
+            Short statementCutoffDay,
+            Short paymentDueDay,
+            String notes,
+            boolean active
+    ) {
+        CreditCard card = creditCardRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Tarjeta de crédito no encontrada: " + id));
+        BigDecimal normalizedLimit = MoneyUtils.normalize(totalLimit);
+        MoneyUtils.assertPositive(normalizedLimit);
+        if (MoneyUtils.isLessThan(normalizedLimit, card.getUsedAmount())) {
+            throw new BusinessRuleException("El cupo total no puede ser menor al monto usado actual");
+        }
+        card.setName(name.trim());
+        card.setTotalLimit(normalizedLimit);
+        card.setStatementCutoffDay(statementCutoffDay);
+        card.setPaymentDueDay(paymentDueDay);
+        card.setNotes(notes);
+        card.setActive(active);
+        card = creditCardRepository.save(card);
+        return creditCardMapper.toResponse(card);
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        CreditCard card = creditCardRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Tarjeta de crédito no encontrada: " + id));
+        card.setActive(false);
+        creditCardRepository.save(card);
+    }
 }

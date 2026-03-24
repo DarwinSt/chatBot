@@ -30,7 +30,7 @@ public class Income extends AuditableEntity {
     @Column(name = "income_date", nullable = false)
     private LocalDate incomeDate;
 
-    @Column(name = "origin", length = 100)
+    @Column(name = "origin", length = 150)
     private String origin;
 
     @Column(name = "description", length = 500)

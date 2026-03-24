@@ -3,6 +3,7 @@ package com.financebot.service.impl;
 import com.financebot.dto.request.AccountCreateRequest;
 import com.financebot.dto.response.AccountResponse;
 import com.financebot.entity.Account;
+import com.financebot.enums.AccountType;
 import com.financebot.exception.ResourceNotFoundException;
 import com.financebot.mapper.AccountMapper;
 import com.financebot.repository.AccountRepository;
@@ -65,5 +66,27 @@ public class AccountServiceImpl implements AccountService {
         return accountRepository.findById(id)
                 .map(accountMapper::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Cuenta no encontrada: " + id));
+    }
+
+    @Override
+    @Transactional
+    public AccountResponse updateBasic(Long id, String name, AccountType type, String notes, boolean active) {
+        Account account = accountRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Cuenta no encontrada: " + id));
+        account.setName(name.trim());
+        account.setType(type);
+        account.setNotes(notes);
+        account.setActive(active);
+        account = accountRepository.save(account);
+        return accountMapper.toResponse(account);
+    }
+
+    @Override
+    @Transactional
+    public void deactivate(Long id) {
+        Account account = accountRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Cuenta no encontrada: " + id));
+        account.setActive(false);
+        accountRepository.save(account);
     }
 }
