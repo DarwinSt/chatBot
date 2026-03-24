@@ -49,6 +49,9 @@ public class TelegramUpdateService {
             TelegramChatSession session = sessionService.getOrCreate(chatId);
             String data = update.callback_query().data();
             if (data != null && !data.isBlank()) {
+                if (commandRouter.dispatchCallbackAction(chatId, session, data)) {
+                    return;
+                }
                 conversationService.handleUserInput(chatId, session, data);
             }
             return;
@@ -74,7 +77,12 @@ public class TelegramUpdateService {
         }
 
         TelegramChatSession latest = sessionService.getOrCreate(chatId);
-        if (latest.getCurrentState() == TelegramConversationState.CONVERSATION) {
+        if (commandRouter.dispatchMenuAction(chatId, latest, trimmed)) {
+            return;
+        }
+        boolean hasFlow = sessionService.hasActiveFlow(latest);
+        boolean hasPendingState = latest.getPendingCommand() != null || latest.getContextData() != null;
+        if (latest.getCurrentState() == TelegramConversationState.CONVERSATION || hasFlow || hasPendingState) {
             conversationService.handleUserInput(chatId, latest, trimmed);
         } else {
             messageSender.sendText(chatId, "Te muestro el menú para que elijas una opción:");

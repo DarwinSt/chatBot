@@ -11,4 +11,10 @@ import java.util.List;
 public interface CategoryService {
 
     List<CategoryRefResponse> listActiveByType(CategoryType type);
+
+    CategoryRefResponse create(String name, CategoryType type);
+
+    CategoryRefResponse update(Long id, String name, CategoryType type, boolean active);
+
+    void deactivate(Long id);
 }

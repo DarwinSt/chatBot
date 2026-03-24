@@ -10,6 +10,9 @@ public final class TelegramDialogConstants {
     public static final String FLOW_CARD_CREATE = "CARD_CREATE";
     public static final String FLOW_CARD_EDIT = "CARD_EDIT";
     public static final String FLOW_CARD_DELETE = "CARD_DELETE";
+    public static final String FLOW_CATEGORY_CREATE = "CATEGORY_CREATE";
+    public static final String FLOW_CATEGORY_EDIT = "CATEGORY_EDIT";
+    public static final String FLOW_CATEGORY_DELETE = "CATEGORY_DELETE";
     public static final String FLOW_DEBT_PAYMENT = "DEBT_PAYMENT";
     public static final String FLOW_TRANSFER = "TRANSFER";
     public static final String FLOW_ACCOUNT_CREATE = "ACCOUNT_CREATE";
@@ -45,6 +48,7 @@ public final class TelegramDialogConstants {
     public static final String STEP_SOURCE = "SOURCE";
     public static final String STEP_DESTINATION = "DESTINATION";
     public static final String STEP_ACCOUNT_TYPE = "ACCOUNT_TYPE";
+    public static final String STEP_CATEGORY_TYPE = "CATEGORY_TYPE";
     public static final String STEP_INITIAL_BALANCE = "INITIAL_BALANCE";
     public static final String STEP_NOTES = "NOTES";
 

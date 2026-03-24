@@ -43,6 +43,9 @@ import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_ACCOU
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_CREATE;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_DELETE;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_EDIT;
+import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CATEGORY_CREATE;
+import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CATEGORY_DELETE;
+import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CATEGORY_EDIT;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_CONSUMPTION;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_PAYMENT;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_DEBT_PAYMENT;
@@ -58,6 +61,7 @@ import static com.financebot.service.telegram.TelegramDialogConstants.STEP_ACTIV
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_AMOUNT;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_CARD;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_CATEGORY;
+import static com.financebot.service.telegram.TelegramDialogConstants.STEP_CATEGORY_TYPE;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_CREDITOR;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_CUTOFF;
 import static com.financebot.service.telegram.TelegramDialogConstants.STEP_DATE;
@@ -131,6 +135,9 @@ public class TelegramConversationService {
                 case FLOW_ACCOUNT_DELETE -> handleAccountDelete(chatId, session, ctx, input);
                 case FLOW_CARD_EDIT -> handleCardEdit(chatId, session, ctx, input);
                 case FLOW_CARD_DELETE -> handleCardDelete(chatId, session, ctx, input);
+                case FLOW_CATEGORY_CREATE -> handleCategoryCreate(chatId, session, ctx, input);
+                case FLOW_CATEGORY_EDIT -> handleCategoryEdit(chatId, session, ctx, input);
+                case FLOW_CATEGORY_DELETE -> handleCategoryDelete(chatId, session, ctx, input);
                 case FLOW_EXPENSE -> handleExpense(chatId, session, ctx, input);
                 case FLOW_INCOME -> handleIncome(chatId, session, ctx, input);
                 case FLOW_DEBT_REGISTER -> handleDebtRegister(chatId, session, ctx, input);
@@ -152,15 +159,17 @@ public class TelegramConversationService {
 
     @Transactional
     public void beginExpenseFlow(String chatId, TelegramChatSession session, String pendingCommand) {
-        if (categoryService.listActiveByType(CategoryType.EXPENSE).isEmpty()) {
+        List<CategoryRefResponse> expenseCategories = categoryService.listActiveByType(CategoryType.EXPENSE);
+        if (expenseCategories.isEmpty()) {
             messageSender.sendText(chatId, "No hay categorías de gasto activas. Crea categorías antes.");
             return;
         }
         TelegramContextPayload ctx = new TelegramContextPayload();
         ctx.flow = FLOW_EXPENSE;
-        ctx.step = STEP_AMOUNT;
+        ctx.fields.put("categoryId", String.valueOf(resolveDefaultExpenseCategoryId(expenseCategories)));
+        ctx.step = STEP_PAYMENT_MODE;
         sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
-        messageSender.sendText(chatId, "Paso 1/4 - Monto del gasto (ej: 25.50):");
+        messageSender.sendText(chatId, "Paso 1/4 - Origen del gasto: escribe 1=cuenta, 2=tarjeta.");
     }
 
     @Transactional
@@ -331,6 +340,51 @@ public class TelegramConversationService {
         ctx.step = STEP_CARD;
         sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
         messageSender.sendText(chatId, "Eliminar tarjeta - Paso 1/2\nElige la tarjeta por número:\n" + formatCards(cards));
+    }
+
+    @Transactional
+    public void beginCategoryCreateFlow(String chatId, TelegramChatSession session, String pendingCommand) {
+        TelegramContextPayload ctx = new TelegramContextPayload();
+        ctx.flow = FLOW_CATEGORY_CREATE;
+        ctx.step = STEP_CATEGORY_TYPE;
+        sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
+        messageSender.sendText(chatId, """
+                Crear categoría - Paso 1/2
+                Tipo:
+                1) INCOME
+                2) EXPENSE
+                3) DEBT
+                """.trim());
+    }
+
+    @Transactional
+    public void beginCategoryEditFlow(String chatId, TelegramChatSession session, String pendingCommand) {
+        TelegramContextPayload ctx = new TelegramContextPayload();
+        ctx.flow = FLOW_CATEGORY_EDIT;
+        ctx.step = STEP_CATEGORY_TYPE;
+        sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
+        messageSender.sendText(chatId, """
+                Editar categoría - Paso 1/3
+                Tipo:
+                1) INCOME
+                2) EXPENSE
+                3) DEBT
+                """.trim());
+    }
+
+    @Transactional
+    public void beginCategoryDeleteFlow(String chatId, TelegramChatSession session, String pendingCommand) {
+        TelegramContextPayload ctx = new TelegramContextPayload();
+        ctx.flow = FLOW_CATEGORY_DELETE;
+        ctx.step = STEP_CATEGORY_TYPE;
+        sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
+        messageSender.sendText(chatId, """
+                Eliminar categoría - Paso 1/3
+                Tipo:
+                1) INCOME
+                2) EXPENSE
+                3) DEBT
+                """.trim());
     }
 
     private void handleAccountCreate(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
@@ -726,36 +780,127 @@ public class TelegramConversationService {
         }
     }
 
-    private void handleExpense(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
+    private void handleCategoryCreate(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
         switch (ctx.step) {
-            case STEP_AMOUNT -> {
-                var amt = TelegramParsingUtils.parseAmount(input);
-                if (amt.isEmpty()) {
-                    messageSender.sendText(chatId, "Monto inválido. Ejemplo: 12.50");
+            case STEP_CATEGORY_TYPE -> {
+                CategoryType type = parseCategoryType(input);
+                if (type == null) {
+                    messageSender.sendText(chatId, "Tipo inválido. Usa 1-3.");
                     return;
                 }
-                ctx.fields.put("amount", amt.get().toPlainString());
+                ctx.fields.put("type", type.name());
+                ctx.step = STEP_NAME;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Crear categoría - Paso 2/2\nNombre:");
+            }
+            case STEP_NAME -> {
+                var created = categoryService.create(input, CategoryType.valueOf(ctx.fields.get("type")));
+                sessionService.resetToIdle(session);
+                messageSender.sendText(chatId, "Categoría creada: " + created.name() + " (" + created.type() + ")");
+            }
+            default -> resetUnknown(chatId, session);
+        }
+    }
+
+    private void handleCategoryEdit(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
+        switch (ctx.step) {
+            case STEP_CATEGORY_TYPE -> {
+                CategoryType type = parseCategoryType(input);
+                if (type == null) {
+                    messageSender.sendText(chatId, "Tipo inválido. Usa 1-3.");
+                    return;
+                }
+                List<CategoryRefResponse> categories = categoryService.listActiveByType(type);
+                if (categories.isEmpty()) {
+                    sessionService.resetToIdle(session);
+                    messageSender.sendText(chatId, "No hay categorías activas de tipo " + type + ".");
+                    return;
+                }
+                ctx.fields.put("type", type.name());
                 ctx.step = STEP_CATEGORY;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(
-                        chatId,
-                        "Paso 2/4 - Elige categoría:",
-                        buildExpenseCategoriesKeyboard(categoryService.listActiveByType(CategoryType.EXPENSE))
-                );
+                messageSender.sendText(chatId, "Editar categoría - Paso 2/3\nElige por número:\n" + formatCategories(categories));
             }
             case STEP_CATEGORY -> {
-                List<CategoryRefResponse> cats = categoryService.listActiveByType(CategoryType.EXPENSE);
-                Long categoryId = parseExpenseCategoryInput(input, cats);
-                if (categoryId == null) {
-                    messageSender.sendText(chatId, "Categoría inválida. Usa los botones o un número válido.");
+                List<CategoryRefResponse> categories = categoryService.listActiveByType(CategoryType.valueOf(ctx.fields.get("type")));
+                var idx = TelegramParsingUtils.parsePositiveInt(input);
+                if (idx.isEmpty() || idx.get() > categories.size()) {
+                    messageSender.sendText(chatId, "Número inválido.");
                     return;
                 }
-                ctx.fields.put("categoryId", String.valueOf(categoryId));
-                ctx.step = STEP_DATE;
+                CategoryRefResponse selected = categories.get(idx.get() - 1);
+                ctx.fields.put("categoryId", String.valueOf(selected.id()));
+                ctx.step = STEP_NAME;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Paso 3/4 - ¿Pago desde cuenta o tarjeta? Escribe 1=cuenta, 2=tarjeta.");
+                messageSender.sendText(chatId, "Editar categoría - Paso 3/3\nNuevo nombre:");
             }
-            case STEP_DATE -> {
+            case STEP_NAME -> {
+                var updated = categoryService.update(
+                        Long.parseLong(ctx.fields.get("categoryId")),
+                        input,
+                        CategoryType.valueOf(ctx.fields.get("type")),
+                        true
+                );
+                sessionService.resetToIdle(session);
+                messageSender.sendText(chatId, "Categoría actualizada: " + updated.name());
+            }
+            default -> resetUnknown(chatId, session);
+        }
+    }
+
+    private void handleCategoryDelete(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
+        switch (ctx.step) {
+            case STEP_CATEGORY_TYPE -> {
+                CategoryType type = parseCategoryType(input);
+                if (type == null) {
+                    messageSender.sendText(chatId, "Tipo inválido. Usa 1-3.");
+                    return;
+                }
+                List<CategoryRefResponse> categories = categoryService.listActiveByType(type);
+                if (categories.isEmpty()) {
+                    sessionService.resetToIdle(session);
+                    messageSender.sendText(chatId, "No hay categorías activas de tipo " + type + ".");
+                    return;
+                }
+                ctx.fields.put("type", type.name());
+                ctx.step = STEP_CATEGORY;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Eliminar categoría - Paso 2/3\nElige por número:\n" + formatCategories(categories));
+            }
+            case STEP_CATEGORY -> {
+                List<CategoryRefResponse> categories = categoryService.listActiveByType(CategoryType.valueOf(ctx.fields.get("type")));
+                var idx = TelegramParsingUtils.parsePositiveInt(input);
+                if (idx.isEmpty() || idx.get() > categories.size()) {
+                    messageSender.sendText(chatId, "Número inválido.");
+                    return;
+                }
+                CategoryRefResponse selected = categories.get(idx.get() - 1);
+                ctx.fields.put("categoryId", String.valueOf(selected.id()));
+                ctx.fields.put("categoryName", selected.name());
+                ctx.step = STEP_CONFIRM;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Confirmar eliminación lógica de '" + selected.name() + "'? (SI/NO)");
+            }
+            case STEP_CONFIRM -> {
+                String t = input.trim().toUpperCase(Locale.ROOT);
+                if ("SI".equals(t) || "S".equals(t)) {
+                    categoryService.deactivate(Long.parseLong(ctx.fields.get("categoryId")));
+                    sessionService.resetToIdle(session);
+                    messageSender.sendText(chatId, "Categoría desactivada correctamente.");
+                } else if ("NO".equals(t) || "N".equals(t)) {
+                    sessionService.resetToIdle(session);
+                    messageSender.sendText(chatId, "Operación cancelada.");
+                } else {
+                    messageSender.sendText(chatId, "Responde SI o NO.");
+                }
+            }
+            default -> resetUnknown(chatId, session);
+        }
+    }
+
+    private void handleExpense(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
+        switch (ctx.step) {
+            case STEP_PAYMENT_MODE -> {
                 String mode = parsePaymentMode(input);
                 if (mode == null) {
                     messageSender.sendText(chatId, "Responde 1 o 2.");
@@ -765,9 +910,9 @@ public class TelegramConversationService {
                 ctx.step = STEP_TARGET;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
                 if (MODE_ACCOUNT.equals(mode)) {
-                    messageSender.sendText(chatId, "Cuenta (número):\n" + formatAccounts(accountService.listActive()));
+                    messageSender.sendText(chatId, "Paso 2/4 - Elige la cuenta origen (número):\n" + formatAccounts(accountService.listActive()));
                 } else {
-                    messageSender.sendText(chatId, "Tarjeta (número):\n" + formatCards(creditCardService.listActive()));
+                    messageSender.sendText(chatId, "Paso 2/4 - Elige la tarjeta origen (número):\n" + formatCards(creditCardService.listActive()));
                 }
             }
             case STEP_TARGET -> {
@@ -782,9 +927,20 @@ public class TelegramConversationService {
                 } else {
                     ctx.fields.put("cardId", String.valueOf(targetId));
                 }
+                ctx.step = STEP_AMOUNT;
+                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
+                messageSender.sendText(chatId, "Paso 3/4 - Cantidad del gasto (ej: 25.50):");
+            }
+            case STEP_AMOUNT -> {
+                var amt = TelegramParsingUtils.parseAmount(input);
+                if (amt.isEmpty()) {
+                    messageSender.sendText(chatId, "Monto inválido. Ejemplo: 12.50");
+                    return;
+                }
+                ctx.fields.put("amount", amt.get().toPlainString());
                 ctx.step = STEP_DESCRIPTION;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Descripción opcional (o '-' para omitir):");
+                messageSender.sendText(chatId, "Paso 4/4 - Descripción (o '-' para omitir):");
             }
             case STEP_DESCRIPTION -> {
                 if (input.startsWith("cb:exp_confirm:")) {
@@ -822,10 +978,11 @@ public class TelegramConversationService {
                 if (notes != null && notes.isBlank()) {
                     notes = null;
                 }
+                String origin = MODE_ACCOUNT.equals(ctx.fields.get("mode")) ? "Cuenta" : "Tarjeta";
                 expenseService.create(new ExpenseCreateRequest(
                         amount,
                         date,
-                        "Telegram",
+                        origin,
                         notes,
                         categoryId,
                         accountId,
@@ -834,14 +991,10 @@ public class TelegramConversationService {
                 sessionService.resetToIdle(session);
                 messageSender.sendText(chatId, "Gasto registrado correctamente.");
             }
-            case "cat" -> {
-                ctx.step = STEP_CATEGORY;
+            case "src" -> {
+                ctx.step = STEP_PAYMENT_MODE;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(
-                        chatId,
-                        "Elige una nueva categoría:",
-                        buildExpenseCategoriesKeyboard(categoryService.listActiveByType(CategoryType.EXPENSE))
-                );
+                messageSender.sendText(chatId, "Origen del gasto: escribe 1=cuenta, 2=tarjeta.");
             }
             case "amt" -> {
                 ctx.step = STEP_AMOUNT;
@@ -869,13 +1022,11 @@ public class TelegramConversationService {
         return """
                 Paso 4/4 - Confirmar gasto
                 Monto: %s
-                Categoría ID: %s
                 Origen: %s #%s
                 Fecha: %s
                 Notas: %s
                 """.formatted(
                 ctx.fields.get("amount"),
-                ctx.fields.get("categoryId"),
                 mode,
                 target,
                 LocalDate.now(),
@@ -888,7 +1039,7 @@ public class TelegramConversationService {
                 "inline_keyboard", List.of(
                         List.of(
                                 Map.of("text", "✅ Confirmar", "callback_data", "cb:exp_confirm:ok"),
-                                Map.of("text", "✏️ Cambiar categoría", "callback_data", "cb:exp_confirm:cat")
+                                Map.of("text", "🔁 Cambiar origen", "callback_data", "cb:exp_confirm:src")
                         ),
                         List.of(
                                 Map.of("text", "🔁 Cambiar monto", "callback_data", "cb:exp_confirm:amt"),
@@ -898,26 +1049,14 @@ public class TelegramConversationService {
         );
     }
 
-    private Map<String, Object> buildExpenseCategoriesKeyboard(List<CategoryRefResponse> categories) {
-        List<List<Map<String, String>>> rows = categories.stream()
-                .map(c -> List.of(Map.of("text", c.name(), "callback_data", "cb:exp_cat:" + c.id())))
-                .toList();
-        return Map.of("inline_keyboard", rows);
-    }
-
-    private Long parseExpenseCategoryInput(String input, List<CategoryRefResponse> categories) {
-        if (input.startsWith("cb:exp_cat:")) {
-            try {
-                return Long.parseLong(input.substring("cb:exp_cat:".length()));
-            } catch (NumberFormatException e) {
-                return null;
+    private Long resolveDefaultExpenseCategoryId(List<CategoryRefResponse> categories) {
+        for (CategoryRefResponse c : categories) {
+            String name = c.name() == null ? "" : c.name().trim().toLowerCase(Locale.ROOT);
+            if ("otros".equals(name) || "general".equals(name)) {
+                return c.id();
             }
         }
-        var idx = TelegramParsingUtils.parsePositiveInt(input);
-        if (idx.isEmpty() || idx.get() > categories.size()) {
-            return null;
-        }
-        return categories.get(idx.get() - 1).id();
+        return categories.get(0).id();
     }
 
     private void handleIncome(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
@@ -941,20 +1080,10 @@ public class TelegramConversationService {
                     return;
                 }
                 ctx.fields.put("categoryId", String.valueOf(cats.get(idx.get() - 1).id()));
-                ctx.step = STEP_DATE;
-                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Fecha del ingreso (yyyy-MM-dd):");
-            }
-            case STEP_DATE -> {
-                var d = TelegramParsingUtils.parseIsoDate(input);
-                if (d.isEmpty()) {
-                    messageSender.sendText(chatId, "Fecha inválida.");
-                    return;
-                }
-                ctx.fields.put("date", d.get().toString());
+                ctx.fields.put("date", LocalDate.now().toString());
                 ctx.step = STEP_ACCOUNT;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Cuenta destino (número):\n" + formatAccounts(accountService.listActive()));
+                messageSender.sendText(chatId, "Fecha del ingreso: hoy.\nCuenta destino (número):\n" + formatAccounts(accountService.listActive()));
             }
             case STEP_ACCOUNT -> {
                 List<AccountResponse> accs = accountService.listActive();
@@ -1096,20 +1225,10 @@ public class TelegramConversationService {
                     return;
                 }
                 ctx.fields.put("categoryId", String.valueOf(cats.get(idx.get() - 1).id()));
-                ctx.step = STEP_DATE;
-                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Fecha (yyyy-MM-dd):");
-            }
-            case STEP_DATE -> {
-                var d = TelegramParsingUtils.parseIsoDate(input);
-                if (d.isEmpty()) {
-                    messageSender.sendText(chatId, "Fecha inválida.");
-                    return;
-                }
-                ctx.fields.put("date", d.get().toString());
+                ctx.fields.put("date", LocalDate.now().toString());
                 ctx.step = STEP_CARD;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Tarjeta (número):\n" + formatCards(creditCardService.listActive()));
+                messageSender.sendText(chatId, "Fecha del consumo: hoy.\nTarjeta (número):\n" + formatCards(creditCardService.listActive()));
             }
             case STEP_CARD -> {
                 List<CreditCardResponse> cards = creditCardService.listActive();
@@ -1161,20 +1280,10 @@ public class TelegramConversationService {
                     return;
                 }
                 ctx.fields.put("amount", amt.get().toPlainString());
-                ctx.step = STEP_DATE;
-                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Fecha del pago (yyyy-MM-dd):");
-            }
-            case STEP_DATE -> {
-                var d = TelegramParsingUtils.parseIsoDate(input);
-                if (d.isEmpty()) {
-                    messageSender.sendText(chatId, "Fecha inválida.");
-                    return;
-                }
-                ctx.fields.put("date", d.get().toString());
+                ctx.fields.put("date", LocalDate.now().toString());
                 ctx.step = STEP_ACCOUNT;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Cuenta origen (número):\n" + formatAccounts(accountService.listActive()));
+                messageSender.sendText(chatId, "Fecha del pago: hoy.\nCuenta origen (número):\n" + formatAccounts(accountService.listActive()));
             }
             case STEP_ACCOUNT -> {
                 List<AccountResponse> accs = accountService.listActive();
@@ -1219,20 +1328,10 @@ public class TelegramConversationService {
                     return;
                 }
                 ctx.fields.put("amount", amt.get().toPlainString());
-                ctx.step = STEP_DATE;
-                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Fecha del abono (yyyy-MM-dd):");
-            }
-            case STEP_DATE -> {
-                var d = TelegramParsingUtils.parseIsoDate(input);
-                if (d.isEmpty()) {
-                    messageSender.sendText(chatId, "Fecha inválida.");
-                    return;
-                }
-                ctx.fields.put("date", d.get().toString());
+                ctx.fields.put("date", LocalDate.now().toString());
                 ctx.step = STEP_ACCOUNT;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Cuenta origen (número):\n" + formatAccounts(accountService.listActive()));
+                messageSender.sendText(chatId, "Fecha del abono: hoy.\nCuenta origen (número):\n" + formatAccounts(accountService.listActive()));
             }
             case STEP_ACCOUNT -> {
                 List<AccountResponse> accs = accountService.listActive();
@@ -1294,20 +1393,10 @@ public class TelegramConversationService {
                     return;
                 }
                 ctx.fields.put("amount", amt.get().toPlainString());
-                ctx.step = STEP_DATE;
-                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Fecha (yyyy-MM-dd):");
-            }
-            case STEP_DATE -> {
-                var d = TelegramParsingUtils.parseIsoDate(input);
-                if (d.isEmpty()) {
-                    messageSender.sendText(chatId, "Fecha inválida.");
-                    return;
-                }
-                ctx.fields.put("date", d.get().toString());
+                ctx.fields.put("date", LocalDate.now().toString());
                 ctx.step = STEP_DESCRIPTION;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Descripción opcional (o '-'):");
+                messageSender.sendText(chatId, "Fecha de transferencia: hoy.\nDescripción opcional (o '-'):");
             }
             case STEP_DESCRIPTION -> {
                 String desc = "-".equals(input) ? null : input;
@@ -1347,6 +1436,16 @@ public class TelegramConversationService {
             case "2", "SAVINGS" -> AccountType.SAVINGS;
             case "3", "CASH" -> AccountType.CASH;
             case "4", "DIGITAL_WALLET", "DIGITAL-WALLET", "WALLET" -> AccountType.DIGITAL_WALLET;
+            default -> null;
+        };
+    }
+
+    private CategoryType parseCategoryType(String input) {
+        String t = input.trim().toUpperCase(Locale.ROOT);
+        return switch (t) {
+            case "1", "INCOME" -> CategoryType.INCOME;
+            case "2", "EXPENSE" -> CategoryType.EXPENSE;
+            case "3", "DEBT" -> CategoryType.DEBT;
             default -> null;
         };
     }

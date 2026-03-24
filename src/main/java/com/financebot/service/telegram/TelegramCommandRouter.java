@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -31,7 +32,71 @@ public class TelegramCommandRouter {
             "/registrar_consumo_tarjeta",
             "/pagar_tarjeta",
             "/abonar_deuda",
-            "/transferir"
+            "/transferir",
+            "/cuenta_crear",
+            "/cuenta_editar",
+            "/cuenta_eliminar",
+            "/tarjeta_crear",
+            "/tarjeta_editar",
+            "/tarjeta_eliminar",
+            "/categoria_crear",
+            "/categoria_editar",
+            "/categoria_eliminar"
+    );
+    private static final Set<String> MENU_BUTTON_ACTIONS = Set.of(
+            "➕ registrar gasto",
+            "➕ movimientos",
+            "📊 resumen",
+            "💼 cuentas",
+            "💳 tarjetas",
+            "📂 categorías",
+            "👀 ver categorías",
+            "➕ agregar categoría",
+            "✏️ editar categoría",
+            "🗑️ eliminar categoría",
+            "➕ crear cuenta",
+            "✏️ editar cuenta",
+            "🗑️ eliminar cuenta",
+            "➕ crear tarjeta",
+            "✏️ editar tarjeta",
+            "🗑️ eliminar tarjeta",
+            "🏠 inicio",
+            "⬅️ volver",
+            "❌ cancelar",
+            "📅 hoy",
+            "🗓️ esta semana",
+            "📆 este mes"
+    );
+    private static final Set<String> MENU_CALLBACK_ACTIONS = Set.of(
+            "menu:main",
+            "menu:movements",
+            "menu:reports",
+            "menu:accounts",
+            "menu:cards",
+            "menu:categories",
+            "menu:cancel",
+            "action:expense",
+            "action:income",
+            "action:debt_register",
+            "action:card_consumption",
+            "action:card_payment",
+            "action:debt_payment",
+            "action:transfer",
+            "action:summary",
+            "action:balance",
+            "action:view_accounts",
+            "action:view_cards",
+            "action:view_debts",
+            "action:account_create",
+            "action:account_edit",
+            "action:account_delete",
+            "action:card_create",
+            "action:card_edit",
+            "action:card_delete",
+            "action:category_create",
+            "action:category_edit",
+            "action:category_delete",
+            "action:category_view"
     );
 
     private final TelegramSessionService sessionService;
@@ -106,11 +171,15 @@ public class TelegramCommandRouter {
                 conversationService.beginExpenseFlow(chatId, fresh, "/registrar_gasto");
                 yield true;
             }
+            case "💼 cuentas" -> {
+                sendAccountsMenu(chatId);
+                yield true;
+            }
             case "/cuentas" -> {
                 messageSender.sendText(chatId, quickReplyService.verCuentas());
                 yield true;
             }
-            case "/cuenta_crear" -> {
+            case "/cuenta_crear", "➕ crear cuenta" -> {
                 if (rawText.contains("|")) {
                     handleAccountCreate(chatId, rawText);
                 } else {
@@ -118,7 +187,7 @@ public class TelegramCommandRouter {
                 }
                 yield true;
             }
-            case "/cuenta_editar" -> {
+            case "/cuenta_editar", "✏️ editar cuenta" -> {
                 if (rawText.contains("|")) {
                     handleAccountUpdate(chatId, rawText);
                 } else {
@@ -126,7 +195,7 @@ public class TelegramCommandRouter {
                 }
                 yield true;
             }
-            case "/cuenta_eliminar" -> {
+            case "/cuenta_eliminar", "🗑️ eliminar cuenta" -> {
                 if (rawText.contains("|")) {
                     handleAccountDelete(chatId, rawText);
                 } else {
@@ -134,11 +203,15 @@ public class TelegramCommandRouter {
                 }
                 yield true;
             }
+            case "💳 tarjetas" -> {
+                sendCardsMenu(chatId);
+                yield true;
+            }
             case "/tarjetas" -> {
                 messageSender.sendText(chatId, quickReplyService.verTarjetas());
                 yield true;
             }
-            case "/tarjeta_crear" -> {
+            case "/tarjeta_crear", "➕ crear tarjeta" -> {
                 if (rawText.contains("|")) {
                     handleCardCreate(chatId, rawText);
                 } else {
@@ -146,7 +219,7 @@ public class TelegramCommandRouter {
                 }
                 yield true;
             }
-            case "/tarjeta_editar" -> {
+            case "/tarjeta_editar", "✏️ editar tarjeta" -> {
                 if (rawText.contains("|")) {
                     handleCardUpdate(chatId, rawText);
                 } else {
@@ -154,7 +227,7 @@ public class TelegramCommandRouter {
                 }
                 yield true;
             }
-            case "/tarjeta_eliminar" -> {
+            case "/tarjeta_eliminar", "🗑️ eliminar tarjeta" -> {
                 if (rawText.contains("|")) {
                     handleCardDelete(chatId, rawText);
                 } else {
@@ -202,7 +275,7 @@ public class TelegramCommandRouter {
                 messageSender.sendText(chatId, quickReplyService.resumenMes());
                 yield true;
             }
-            case "📊 resumen", "📅 hoy", "🗓️ esta semana", "📆 este mes" -> {
+            case "📅 hoy", "🗓️ esta semana", "📆 este mes" -> {
                 messageSender.sendText(chatId, quickReplyService.resumenMes());
                 yield true;
             }
@@ -210,12 +283,41 @@ public class TelegramCommandRouter {
                 messageSender.sendText(chatId, "Pronto: reporte por categorías detallado.");
                 yield true;
             }
-            case "📂 categorías", "👀 ver categorías", "➕ agregar categoría", "✏️ editar categoría", "🗑️ eliminar categoría" -> {
-                messageSender.sendText(chatId, "Módulo de categorías en construcción. Usa API REST por ahora.");
+            case "📂 categorías", "/categorias" -> {
+                sendCategoriesMenu(chatId);
+                yield true;
+            }
+            case "👀 ver categorías" -> {
+                messageSender.sendText(chatId, """
+                        Categorías por tipo:
+                        /categoria_ver_ingreso
+                        /categoria_ver_gasto
+                        /categoria_ver_deuda
+                        """.trim());
+                yield true;
+            }
+            case "/categoria_crear", "➕ agregar categoría" -> {
+                conversationService.beginCategoryCreateFlow(chatId, fresh, "/categoria_crear");
+                yield true;
+            }
+            case "/categoria_editar", "✏️ editar categoría" -> {
+                conversationService.beginCategoryEditFlow(chatId, fresh, "/categoria_editar");
+                yield true;
+            }
+            case "/categoria_eliminar", "🗑️ eliminar categoría" -> {
+                conversationService.beginCategoryDeleteFlow(chatId, fresh, "/categoria_eliminar");
                 yield true;
             }
             case "🎯 presupuesto", "⚙️ ajustes" -> {
                 messageSender.sendText(chatId, "Módulo en construcción. Usa /menu para continuar.");
+                yield true;
+            }
+            case "➕ movimientos" -> {
+                sendMovementsMenu(chatId);
+                yield true;
+            }
+            case "📊 resumen" -> {
+                sendReportsMenu(chatId);
                 yield true;
             }
             case "🏠 inicio" -> {
@@ -246,15 +348,104 @@ public class TelegramCommandRouter {
         return true;
     }
 
+    /**
+     * Maneja solo acciones de botones del menú (texto sin slash).
+     * Devuelve false si el texto no corresponde a un botón navegable.
+     */
+    @Transactional
+    public boolean dispatchMenuAction(String chatId, TelegramChatSession session, String rawText) {
+        String normalized = normalizeCommandToken(rawText);
+        if (!MENU_BUTTON_ACTIONS.contains(normalized)) {
+            return false;
+        }
+        if (session.getCurrentState() == TelegramConversationState.CONVERSATION
+                && !"❌ cancelar".equals(normalized)) {
+            // Si pulsa un botón de navegación mientras hay wizard activo, lo cerramos.
+            sessionService.resetToIdle(session);
+        }
+        dispatch(chatId, session, rawText);
+        return true;
+    }
+
+    @Transactional
+    public boolean dispatchCallbackAction(String chatId, TelegramChatSession session, String callbackData) {
+        String normalized = callbackData == null ? "" : callbackData.trim().toLowerCase(Locale.ROOT);
+        if (!MENU_CALLBACK_ACTIONS.contains(normalized)) {
+            return false;
+        }
+        if (session.getCurrentState() == TelegramConversationState.CONVERSATION
+                && !"menu:cancel".equals(normalized)) {
+            sessionService.resetToIdle(session);
+        }
+        return switch (normalized) {
+            case "menu:main" -> {
+                sendMainMenu(chatId);
+                yield true;
+            }
+            case "menu:movements" -> {
+                sendMovementsMenu(chatId);
+                yield true;
+            }
+            case "menu:reports" -> {
+                sendReportsMenu(chatId);
+                yield true;
+            }
+            case "menu:accounts" -> {
+                sendAccountsMenu(chatId);
+                yield true;
+            }
+            case "menu:cards" -> {
+                sendCardsMenu(chatId);
+                yield true;
+            }
+            case "menu:categories" -> {
+                sendCategoriesMenu(chatId);
+                yield true;
+            }
+            case "menu:cancel" -> {
+                sessionService.resetToIdle(session);
+                messageSender.sendText(chatId, "Conversación cancelada.");
+                sendMainMenu(chatId);
+                yield true;
+            }
+            case "action:expense" -> dispatch(chatId, session, "/registrar_gasto");
+            case "action:income" -> dispatch(chatId, session, "/registrar_ingreso");
+            case "action:debt_register" -> dispatch(chatId, session, "/registrar_deuda");
+            case "action:card_consumption" -> dispatch(chatId, session, "/registrar_consumo_tarjeta");
+            case "action:card_payment" -> dispatch(chatId, session, "/pagar_tarjeta");
+            case "action:debt_payment" -> dispatch(chatId, session, "/abonar_deuda");
+            case "action:transfer" -> dispatch(chatId, session, "/transferir");
+            case "action:summary" -> dispatch(chatId, session, "/resumen_mes");
+            case "action:balance" -> dispatch(chatId, session, "/balance");
+            case "action:view_accounts" -> dispatch(chatId, session, "/ver_cuentas");
+            case "action:view_cards" -> dispatch(chatId, session, "/ver_tarjetas");
+            case "action:view_debts" -> dispatch(chatId, session, "/ver_deudas");
+            case "action:account_create" -> dispatch(chatId, session, "/cuenta_crear");
+            case "action:account_edit" -> dispatch(chatId, session, "/cuenta_editar");
+            case "action:account_delete" -> dispatch(chatId, session, "/cuenta_eliminar");
+            case "action:card_create" -> dispatch(chatId, session, "/tarjeta_crear");
+            case "action:card_edit" -> dispatch(chatId, session, "/tarjeta_editar");
+            case "action:card_delete" -> dispatch(chatId, session, "/tarjeta_eliminar");
+            case "action:category_create" -> dispatch(chatId, session, "/categoria_crear");
+            case "action:category_edit" -> dispatch(chatId, session, "/categoria_editar");
+            case "action:category_delete" -> dispatch(chatId, session, "/categoria_eliminar");
+            case "action:category_view" -> dispatch(chatId, session, "👀 ver categorías");
+            default -> false;
+        };
+    }
+
     private static String normalizeCommandToken(String rawText) {
         String trimmed = rawText.trim();
-        int space = trimmed.indexOf(' ');
-        String first = space == -1 ? trimmed : trimmed.substring(0, space);
-        first = first.toLowerCase(Locale.ROOT);
-        if (first.contains("@")) {
-            first = first.substring(0, first.indexOf('@'));
+        if (trimmed.startsWith("/")) {
+            int space = trimmed.indexOf(' ');
+            String first = space == -1 ? trimmed : trimmed.substring(0, space);
+            first = first.toLowerCase(Locale.ROOT);
+            if (first.contains("@")) {
+                first = first.substring(0, first.indexOf('@'));
+            }
+            return first;
         }
-        return first;
+        return trimmed.toLowerCase(Locale.ROOT);
     }
 
     private static String welcomeText() {
@@ -266,44 +457,115 @@ public class TelegramCommandRouter {
 
     private static String menuText() {
         return """
-                MENÚ PRINCIPAL
-                1) Registros
-                - /registrar_gasto
-                - /registrar_ingreso
-                - /registrar_deuda
-                - /registrar_consumo_tarjeta
-                - /pagar_tarjeta
-                - /abonar_deuda
-                - /transferir
-
-                2) Cuentas (CRUD)
-                - /cuentas
-                - /cuenta_crear  (wizard paso a paso)
-                - /cuenta_editar  (wizard paso a paso)
-                - /cuenta_eliminar  (wizard con confirmación)
-
-                3) Tarjetas (CRUD)
-                - /tarjetas
-                - /tarjeta_crear  (wizard paso a paso)
-                - /tarjeta_editar  (wizard paso a paso)
-                - /tarjeta_eliminar  (wizard con confirmación)
-
-                4) Consultas
-                - /ver_cuentas
-                - /ver_deudas
-                - /ver_tarjetas
-                - /resumen_mes
-                - /balance
-
-                Atajos:
-                - /menu
-                - /ayuda
-                - /cancelar
+                Menú principal
+                Selecciona una sección:
                 """.trim();
     }
 
     void sendMainMenu(String chatId) {
-        messageSender.sendText(chatId, menuText());
+        messageSender.sendText(chatId, menuText(), buildMainMenuInlineKeyboard());
+    }
+
+    private void sendAccountsMenu(String chatId) {
+        messageSender.sendText(chatId, "Cuentas: elige una opción.", buildAccountsMenuInlineKeyboard());
+    }
+
+    private void sendCardsMenu(String chatId) {
+        messageSender.sendText(chatId, "Tarjetas: elige una opción.", buildCardsMenuInlineKeyboard());
+    }
+
+    private void sendCategoriesMenu(String chatId) {
+        messageSender.sendText(chatId, "Categorías: elige una opción.", buildCategoriesMenuInlineKeyboard());
+    }
+
+    private void sendMovementsMenu(String chatId) {
+        messageSender.sendText(chatId, "Movimientos: elige una opción.", buildMovementsMenuInlineKeyboard());
+    }
+
+    private void sendReportsMenu(String chatId) {
+        messageSender.sendText(chatId, "Resumen y consultas: elige una opción.", buildReportsMenuInlineKeyboard());
+    }
+
+    private static Map<String, Object> buildMainMenuInlineKeyboard() {
+        return Map.of(
+                "inline_keyboard", List.of(
+                        List.of(Map.of("text", "➕ Movimientos", "callback_data", "menu:movements"),
+                                Map.of("text", "📊 Resumen", "callback_data", "menu:reports")),
+                        List.of(Map.of("text", "💼 Cuentas", "callback_data", "menu:accounts"),
+                                Map.of("text", "💳 Tarjetas", "callback_data", "menu:cards")),
+                        List.of(Map.of("text", "📂 Categorías", "callback_data", "menu:categories")),
+                        List.of(Map.of("text", "❌ Cancelar", "callback_data", "menu:cancel"))
+                )
+        );
+    }
+
+    private static Map<String, Object> buildAccountsMenuInlineKeyboard() {
+        return Map.of(
+                "inline_keyboard", List.of(
+                        List.of(Map.of("text", "➕ Crear cuenta", "callback_data", "action:account_create"),
+                                Map.of("text", "✏️ Editar cuenta", "callback_data", "action:account_edit")),
+                        List.of(Map.of("text", "🗑️ Eliminar cuenta", "callback_data", "action:account_delete"),
+                                Map.of("text", "👀 Ver cuentas", "callback_data", "action:view_accounts")),
+                        List.of(Map.of("text", "⬅️ Volver", "callback_data", "menu:main"),
+                                Map.of("text", "❌ Cancelar", "callback_data", "menu:cancel"))
+                )
+        );
+    }
+
+    private static Map<String, Object> buildCardsMenuInlineKeyboard() {
+        return Map.of(
+                "inline_keyboard", List.of(
+                        List.of(Map.of("text", "➕ Crear tarjeta", "callback_data", "action:card_create"),
+                                Map.of("text", "✏️ Editar tarjeta", "callback_data", "action:card_edit")),
+                        List.of(Map.of("text", "🗑️ Eliminar tarjeta", "callback_data", "action:card_delete"),
+                                Map.of("text", "👀 Ver tarjetas", "callback_data", "action:view_cards")),
+                        List.of(Map.of("text", "⬅️ Volver", "callback_data", "menu:main"),
+                                Map.of("text", "❌ Cancelar", "callback_data", "menu:cancel"))
+                )
+        );
+    }
+
+    private static Map<String, Object> buildCategoriesMenuInlineKeyboard() {
+        return Map.of(
+                "inline_keyboard", List.of(
+                        List.of(Map.of("text", "👀 Ver categorías", "callback_data", "action:category_view"),
+                                Map.of("text", "➕ Agregar categoría", "callback_data", "action:category_create")),
+                        List.of(Map.of("text", "✏️ Editar categoría", "callback_data", "action:category_edit"),
+                                Map.of("text", "🗑️ Eliminar categoría", "callback_data", "action:category_delete")),
+                        List.of(Map.of("text", "⬅️ Volver", "callback_data", "menu:main"),
+                                Map.of("text", "❌ Cancelar", "callback_data", "menu:cancel"))
+                )
+        );
+    }
+
+    private static Map<String, Object> buildMovementsMenuInlineKeyboard() {
+        return Map.of(
+                "inline_keyboard", List.of(
+                        List.of(Map.of("text", "➕ Registrar gasto", "callback_data", "action:expense"),
+                                Map.of("text", "💰 Registrar ingreso", "callback_data", "action:income")),
+                        List.of(Map.of("text", "🧾 Registrar deuda", "callback_data", "action:debt_register"),
+                                Map.of("text", "💳 Consumo tarjeta", "callback_data", "action:card_consumption")),
+                        List.of(Map.of("text", "🏦 Pagar tarjeta", "callback_data", "action:card_payment"),
+                                Map.of("text", "📉 Abonar deuda", "callback_data", "action:debt_payment")),
+                        List.of(Map.of("text", "🔁 Transferir", "callback_data", "action:transfer")),
+                        List.of(Map.of("text", "⬅️ Volver", "callback_data", "menu:main"),
+                                Map.of("text", "❌ Cancelar", "callback_data", "menu:cancel"))
+                )
+        );
+    }
+
+    private static Map<String, Object> buildReportsMenuInlineKeyboard() {
+        return Map.of(
+                "inline_keyboard", List.of(
+                        List.of(Map.of("text", "📆 Resumen mes", "callback_data", "action:summary"),
+                                Map.of("text", "⚖️ Balance", "callback_data", "action:balance")),
+                        List.of(Map.of("text", "👀 Ver cuentas", "callback_data", "action:view_accounts"),
+                                Map.of("text", "👀 Ver tarjetas", "callback_data", "action:view_cards")),
+                        List.of(Map.of("text", "👀 Ver deudas", "callback_data", "action:view_debts")),
+                        List.of(Map.of("text", "⬅️ Volver", "callback_data", "menu:main"),
+                                Map.of("text", "❌ Cancelar", "callback_data", "menu:cancel"))
+                )
+        );
     }
 
     private void handleAccountCreate(String chatId, String rawText) {

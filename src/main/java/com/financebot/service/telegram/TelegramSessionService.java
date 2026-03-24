@@ -45,6 +45,12 @@ public class TelegramSessionService {
         return contextMapper.fromJson(session.getContextData());
     }
 
+    public boolean hasActiveFlow(TelegramChatSession session) {
+        TelegramContextPayload payload = readPayload(session);
+        return payload.flow != null && !payload.flow.isBlank()
+                && payload.step != null && !payload.step.isBlank();
+    }
+
     @Transactional
     public void save(TelegramChatSession session, TelegramConversationState state, String pendingCommand, TelegramContextPayload payload) {
         session.setCurrentState(state);
