@@ -1,0 +1,12 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Credenciales BD (YAML en la raíz; usar application-db.yml.example como plantilla)
+/application-db.yml

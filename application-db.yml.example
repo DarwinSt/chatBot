@@ -1,0 +1,10 @@
+# Copia este archivo en la raíz del proyecto como: application-db.yml
+# (application-db.yml está en .gitignore)
+#
+# Base creada manualmente en PostgreSQL (ej.: financesbot)
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/financesbot
+    username: postgres
+    password: tu_password
