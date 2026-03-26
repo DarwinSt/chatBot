@@ -121,7 +121,7 @@ public class TelegramQuickReplyService {
             }
         }
         sb.append("\nTarjetas:\n");
-        for (CreditCardResponse c : creditCardService.listAll()) {
+        for (CreditCardResponse c : creditCardService.listActive()) {
             sb.append("- ").append(c.name())
                     .append(" | usado ").append(fmt(c.usedAmount()))
                     .append(" | disponible ").append(fmt(c.availableCredit())).append("\n");

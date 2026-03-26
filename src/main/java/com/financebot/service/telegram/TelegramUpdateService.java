@@ -6,6 +6,7 @@ import com.financebot.enums.TelegramConversationState;
 import com.financebot.integration.telegram.TelegramMessageSender;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,6 +57,7 @@ public class TelegramUpdateService {
                 return;
             }
             conversationService.handleUserInput(chatId, session, data);
+            maybeSendMainMenuButton(chatId);
             return;
         }
         if (update.message() == null) {
@@ -83,9 +85,28 @@ public class TelegramUpdateService {
         boolean hasPendingState = latest.getPendingCommand() != null || latest.getContextData() != null;
         if (latest.getCurrentState() == TelegramConversationState.CONVERSATION || hasFlow || hasPendingState) {
             conversationService.handleUserInput(chatId, latest, trimmed);
+            maybeSendMainMenuButton(chatId);
         } else {
             commandRouter.sendMainMenu(chatId);
         }
+    }
+
+    private void maybeSendMainMenuButton(String chatId) {
+        TelegramChatSession latestAfter = sessionService.getOrCreate(chatId);
+        boolean conversationActive = latestAfter.getCurrentState() == TelegramConversationState.CONVERSATION
+                || sessionService.hasActiveFlow(latestAfter);
+        if (!conversationActive) {
+            return;
+        }
+        messageSender.sendText(chatId, "Volver al menú principal:", buildMainMenuBackKeyboard());
+    }
+
+    private static Map<String, Object> buildMainMenuBackKeyboard() {
+        return Map.of(
+                "inline_keyboard", List.of(
+                        List.of(Map.of("text", "🏠 Menú principal", "callback_data", "menu:main"))
+                )
+        );
     }
 
     private boolean isDuplicateUpdate(Long updateId) {
