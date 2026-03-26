@@ -27,4 +27,5 @@ app:
   telegram:
     bot-token: ${TELEGRAM_BOT_TOKEN:8580733376:AAHHnR5hjSHOhW3kCwy-XF9k2zbZjwtX69Q}
     webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+  # Telegram exige HTTPS para setWebhook; en local usa un túnel (ngrok, cloudflare) y APP_BASE_URL=https://...
   base-url: ${APP_BASE_URL:http://localhost:${SERVER_PORT:8080}}

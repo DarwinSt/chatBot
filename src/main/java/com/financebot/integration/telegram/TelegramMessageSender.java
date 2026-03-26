@@ -2,6 +2,8 @@ package com.financebot.integration.telegram;
 
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 /**
  * Punto único para enviar texto al usuario vía Telegram (adaptador de salida).
  */
@@ -24,5 +26,17 @@ public class TelegramMessageSender {
         }
         String trimmed = text.length() > 4000 ? text.substring(0, 3997) + "..." : text;
         telegramApiClient.sendMessage(chatId, trimmed, replyMarkup);
+    }
+
+    public void answerCallback(String callbackQueryId) {
+        telegramApiClient.answerCallbackQuery(callbackQueryId);
+    }
+
+    public void registerWebhook(String webhookUrl, String webhookSecret) {
+        telegramApiClient.setWebhook(webhookUrl, webhookSecret);
+    }
+
+    public Map<String, Object> getWebhookInfo() {
+        return telegramApiClient.getWebhookInfo();
     }
 }

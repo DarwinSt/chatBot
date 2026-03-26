@@ -43,30 +43,6 @@ public class TelegramCommandRouter {
             "/categoria_editar",
             "/categoria_eliminar"
     );
-    private static final Set<String> MENU_BUTTON_ACTIONS = Set.of(
-            "➕ registrar gasto",
-            "➕ movimientos",
-            "📊 resumen",
-            "💼 cuentas",
-            "💳 tarjetas",
-            "📂 categorías",
-            "👀 ver categorías",
-            "➕ agregar categoría",
-            "✏️ editar categoría",
-            "🗑️ eliminar categoría",
-            "➕ crear cuenta",
-            "✏️ editar cuenta",
-            "🗑️ eliminar cuenta",
-            "➕ crear tarjeta",
-            "✏️ editar tarjeta",
-            "🗑️ eliminar tarjeta",
-            "🏠 inicio",
-            "⬅️ volver",
-            "❌ cancelar",
-            "📅 hoy",
-            "🗓️ esta semana",
-            "📆 este mes"
-    );
     private static final Set<String> MENU_CALLBACK_ACTIONS = Set.of(
             "menu:main",
             "menu:movements",
@@ -147,7 +123,6 @@ public class TelegramCommandRouter {
         }
 
         if ("/start".equals(normalized)) {
-            messageSender.sendText(chatId, welcomeText());
             sendMainMenu(chatId);
             return true;
         }
@@ -167,19 +142,11 @@ public class TelegramCommandRouter {
                 conversationService.beginExpenseFlow(chatId, fresh, normalized);
                 yield true;
             }
-            case "➕ registrar gasto" -> {
-                conversationService.beginExpenseFlow(chatId, fresh, "/registrar_gasto");
-                yield true;
-            }
-            case "💼 cuentas" -> {
-                sendAccountsMenu(chatId);
-                yield true;
-            }
             case "/cuentas" -> {
                 messageSender.sendText(chatId, quickReplyService.verCuentas());
                 yield true;
             }
-            case "/cuenta_crear", "➕ crear cuenta" -> {
+            case "/cuenta_crear" -> {
                 if (rawText.contains("|")) {
                     handleAccountCreate(chatId, rawText);
                 } else {
@@ -187,7 +154,7 @@ public class TelegramCommandRouter {
                 }
                 yield true;
             }
-            case "/cuenta_editar", "✏️ editar cuenta" -> {
+            case "/cuenta_editar" -> {
                 if (rawText.contains("|")) {
                     handleAccountUpdate(chatId, rawText);
                 } else {
@@ -195,7 +162,7 @@ public class TelegramCommandRouter {
                 }
                 yield true;
             }
-            case "/cuenta_eliminar", "🗑️ eliminar cuenta" -> {
+            case "/cuenta_eliminar" -> {
                 if (rawText.contains("|")) {
                     handleAccountDelete(chatId, rawText);
                 } else {
@@ -203,15 +170,11 @@ public class TelegramCommandRouter {
                 }
                 yield true;
             }
-            case "💳 tarjetas" -> {
-                sendCardsMenu(chatId);
-                yield true;
-            }
             case "/tarjetas" -> {
                 messageSender.sendText(chatId, quickReplyService.verTarjetas());
                 yield true;
             }
-            case "/tarjeta_crear", "➕ crear tarjeta" -> {
+            case "/tarjeta_crear" -> {
                 if (rawText.contains("|")) {
                     handleCardCreate(chatId, rawText);
                 } else {
@@ -219,7 +182,7 @@ public class TelegramCommandRouter {
                 }
                 yield true;
             }
-            case "/tarjeta_editar", "✏️ editar tarjeta" -> {
+            case "/tarjeta_editar" -> {
                 if (rawText.contains("|")) {
                     handleCardUpdate(chatId, rawText);
                 } else {
@@ -227,7 +190,7 @@ public class TelegramCommandRouter {
                 }
                 yield true;
             }
-            case "/tarjeta_eliminar", "🗑️ eliminar tarjeta" -> {
+            case "/tarjeta_eliminar" -> {
                 if (rawText.contains("|")) {
                     handleCardDelete(chatId, rawText);
                 } else {
@@ -275,15 +238,7 @@ public class TelegramCommandRouter {
                 messageSender.sendText(chatId, quickReplyService.resumenMes());
                 yield true;
             }
-            case "📅 hoy", "🗓️ esta semana", "📆 este mes" -> {
-                messageSender.sendText(chatId, quickReplyService.resumenMes());
-                yield true;
-            }
-            case "📈 por categorías" -> {
-                messageSender.sendText(chatId, "Pronto: reporte por categorías detallado.");
-                yield true;
-            }
-            case "📂 categorías", "/categorias" -> {
+            case "/categorias" -> {
                 sendCategoriesMenu(chatId);
                 yield true;
             }
@@ -296,43 +251,16 @@ public class TelegramCommandRouter {
                         """.trim());
                 yield true;
             }
-            case "/categoria_crear", "➕ agregar categoría" -> {
+            case "/categoria_crear" -> {
                 conversationService.beginCategoryCreateFlow(chatId, fresh, "/categoria_crear");
                 yield true;
             }
-            case "/categoria_editar", "✏️ editar categoría" -> {
+            case "/categoria_editar" -> {
                 conversationService.beginCategoryEditFlow(chatId, fresh, "/categoria_editar");
                 yield true;
             }
-            case "/categoria_eliminar", "🗑️ eliminar categoría" -> {
+            case "/categoria_eliminar" -> {
                 conversationService.beginCategoryDeleteFlow(chatId, fresh, "/categoria_eliminar");
-                yield true;
-            }
-            case "🎯 presupuesto", "⚙️ ajustes" -> {
-                messageSender.sendText(chatId, "Módulo en construcción. Usa /menu para continuar.");
-                yield true;
-            }
-            case "➕ movimientos" -> {
-                sendMovementsMenu(chatId);
-                yield true;
-            }
-            case "📊 resumen" -> {
-                sendReportsMenu(chatId);
-                yield true;
-            }
-            case "🏠 inicio" -> {
-                messageSender.sendText(chatId, welcomeText());
-                sendMainMenu(chatId);
-                yield true;
-            }
-            case "⬅️ volver" -> {
-                sendMainMenu(chatId);
-                yield true;
-            }
-            case "❌ cancelar" -> {
-                sessionService.resetToIdle(fresh);
-                messageSender.sendText(chatId, "Conversación cancelada.");
-                sendMainMenu(chatId);
                 yield true;
             }
             case "/balance" -> {
@@ -345,25 +273,6 @@ public class TelegramCommandRouter {
         if (!handled) {
             messageSender.sendText(chatId, "Comando no reconocido. Usa /menu.");
         }
-        return true;
-    }
-
-    /**
-     * Maneja solo acciones de botones del menú (texto sin slash).
-     * Devuelve false si el texto no corresponde a un botón navegable.
-     */
-    @Transactional
-    public boolean dispatchMenuAction(String chatId, TelegramChatSession session, String rawText) {
-        String normalized = normalizeCommandToken(rawText);
-        if (!MENU_BUTTON_ACTIONS.contains(normalized)) {
-            return false;
-        }
-        if (session.getCurrentState() == TelegramConversationState.CONVERSATION
-                && !"❌ cancelar".equals(normalized)) {
-            // Si pulsa un botón de navegación mientras hay wizard activo, lo cerramos.
-            sessionService.resetToIdle(session);
-        }
-        dispatch(chatId, session, rawText);
         return true;
     }
 
@@ -446,13 +355,6 @@ public class TelegramCommandRouter {
             return first;
         }
         return trimmed.toLowerCase(Locale.ROOT);
-    }
-
-    private static String welcomeText() {
-        return """
-                ¡Hola! Soy tu asistente financiero personal.
-                Te ayudo a registrar movimientos y consultar tu resumen.
-                """.trim();
     }
 
     private static String menuText() {

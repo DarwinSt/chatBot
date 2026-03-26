@@ -42,18 +42,22 @@ public class TelegramUpdateService {
         if (isDuplicateUpdate(update.update_id())) {
             return;
         }
-        if (update.callback_query() != null
-                && update.callback_query().message() != null
-                && update.callback_query().message().chat() != null) {
+        if (update.callback_query() != null) {
+            if (update.callback_query().message() == null
+                    || update.callback_query().message().chat() == null) {
+                return;
+            }
             String chatId = String.valueOf(update.callback_query().message().chat().id());
             TelegramChatSession session = sessionService.getOrCreate(chatId);
             String data = update.callback_query().data();
-            if (data != null && !data.isBlank()) {
-                if (commandRouter.dispatchCallbackAction(chatId, session, data)) {
-                    return;
-                }
-                conversationService.handleUserInput(chatId, session, data);
+            if (data == null || data.isBlank()) {
+                commandRouter.sendMainMenu(chatId);
+                return;
             }
+            if (commandRouter.dispatchCallbackAction(chatId, session, data)) {
+                return;
+            }
+            conversationService.handleUserInput(chatId, session, data);
             return;
         }
         if (update.message() == null) {
@@ -77,15 +81,11 @@ public class TelegramUpdateService {
         }
 
         TelegramChatSession latest = sessionService.getOrCreate(chatId);
-        if (commandRouter.dispatchMenuAction(chatId, latest, trimmed)) {
-            return;
-        }
         boolean hasFlow = sessionService.hasActiveFlow(latest);
         boolean hasPendingState = latest.getPendingCommand() != null || latest.getContextData() != null;
         if (latest.getCurrentState() == TelegramConversationState.CONVERSATION || hasFlow || hasPendingState) {
             conversationService.handleUserInput(chatId, latest, trimmed);
         } else {
-            messageSender.sendText(chatId, "Te muestro el menú para que elijas una opción:");
             commandRouter.sendMainMenu(chatId);
         }
     }
