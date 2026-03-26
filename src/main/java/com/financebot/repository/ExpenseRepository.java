@@ -27,6 +27,22 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("type") ExpenseType type);
 
     @Query("""
+            SELECT COALESCE(SUM(e.amount), 0) FROM Expense e
+            WHERE e.expenseDate BETWEEN :start AND :end AND e.paymentAccount IS NOT NULL
+            """)
+    BigDecimal sumAmountBetweenAndPaymentAccountPresent(
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end);
+
+    @Query("""
+            SELECT COALESCE(SUM(e.amount), 0) FROM Expense e
+            WHERE e.expenseDate BETWEEN :start AND :end AND e.creditCard IS NOT NULL
+            """)
+    BigDecimal sumAmountBetweenAndCreditCardPresent(
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end);
+
+    @Query("""
             SELECT c.id, c.name, COALESCE(SUM(e.amount), 0)
             FROM Expense e JOIN e.category c
             WHERE e.expenseDate BETWEEN :start AND :end

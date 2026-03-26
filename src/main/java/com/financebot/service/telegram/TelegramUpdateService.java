@@ -5,7 +5,6 @@ import com.financebot.entity.TelegramChatSession;
 import com.financebot.enums.TelegramConversationState;
 import com.financebot.integration.telegram.TelegramMessageSender;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -34,7 +33,6 @@ public class TelegramUpdateService {
         this.messageSender = messageSender;
     }
 
-    @Transactional
     public void process(TelegramUpdateDto update) {
         if (update == null) {
             return;

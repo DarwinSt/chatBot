@@ -24,12 +24,16 @@ import com.financebot.util.MoneyUtils;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 @Service
 public class ExpenseServiceImpl implements ExpenseService {
+
+    private static final Logger log = LoggerFactory.getLogger(ExpenseServiceImpl.class);
 
     private final ExpenseRepository expenseRepository;
     private final CategoryRepository categoryRepository;
@@ -92,8 +96,13 @@ public class ExpenseServiceImpl implements ExpenseService {
         expense.setDescription(buildDescription(request));
         expense.setCategory(category);
 
+        // `expense_type` en tu BD representa si el gasto es FIJO o VARIABLE.
+        // En este flujo no solicitamos ese dato, así que por defecto registramos VARIABLE.
+        // (Se puede extender después agregando un paso en el wizard.)
+        expense.setExpenseType(ExpenseType.VARIABLE);
+        log.info("ExpenseServiceImpl.create expenseType set to {}", expense.getExpenseType());
+
         if (hasAccount) {
-            expense.setExpenseType(ExpenseType.ACCOUNT);
             Account account = accountRepository
                     .findById(request.paymentAccountId())
                     .orElseThrow(() -> new ResourceNotFoundException("Cuenta de pago no encontrada"));
@@ -108,7 +117,6 @@ public class ExpenseServiceImpl implements ExpenseService {
             expense.setPaymentAccount(account);
             expense.setCreditCard(null);
         } else {
-            expense.setExpenseType(ExpenseType.CREDIT_CARD);
             CreditCard card = creditCardRepository
                     .findById(request.creditCardId())
                     .orElseThrow(() -> new ResourceNotFoundException("Tarjeta de crédito no encontrada"));

@@ -17,7 +17,6 @@ import com.financebot.dto.response.TransferResponse;
 import com.financebot.entity.Debt;
 import com.financebot.entity.Reminder;
 import com.financebot.enums.DebtStatus;
-import com.financebot.enums.ExpenseType;
 import com.financebot.exception.BusinessRuleException;
 import com.financebot.mapper.*;
 import com.financebot.repository.AccountRepository;
@@ -112,9 +111,9 @@ public class ReportServiceImpl implements ReportService {
         BigDecimal totalIncomes = nz(incomeRepository.sumAmountBetween(start, end));
         BigDecimal totalExpensesAll = nz(expenseRepository.sumAmountBetween(start, end));
         BigDecimal totalExpensesFromAccounts = nz(
-                expenseRepository.sumAmountBetweenAndExpenseType(start, end, ExpenseType.ACCOUNT));
+                expenseRepository.sumAmountBetweenAndPaymentAccountPresent(start, end));
         BigDecimal totalCreditCardCharges = nz(
-                expenseRepository.sumAmountBetweenAndExpenseType(start, end, ExpenseType.CREDIT_CARD));
+                expenseRepository.sumAmountBetweenAndCreditCardPresent(start, end));
         BigDecimal totalCreditCardPayments = nz(creditCardPaymentRepository.sumAmountBetween(start, end));
         BigDecimal totalDebtPayments = nz(debtPaymentRepository.sumAmountBetween(start, end));
 
@@ -173,9 +172,9 @@ public class ReportServiceImpl implements ReportService {
         BigDecimal totalIncomes = nz(incomeRepository.sumAmountBetween(start, end));
         BigDecimal totalExpensesAll = nz(expenseRepository.sumAmountBetween(start, end));
         BigDecimal totalExpensesFromAccounts = nz(
-                expenseRepository.sumAmountBetweenAndExpenseType(start, end, ExpenseType.ACCOUNT));
+                expenseRepository.sumAmountBetweenAndPaymentAccountPresent(start, end));
         BigDecimal totalCreditCardCharges = nz(
-                expenseRepository.sumAmountBetweenAndExpenseType(start, end, ExpenseType.CREDIT_CARD));
+                expenseRepository.sumAmountBetweenAndCreditCardPresent(start, end));
         BigDecimal totalCreditCardPayments = nz(creditCardPaymentRepository.sumAmountBetween(start, end));
         BigDecimal totalDebtPayments = nz(debtPaymentRepository.sumAmountBetween(start, end));
 
