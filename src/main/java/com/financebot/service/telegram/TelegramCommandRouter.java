@@ -364,8 +364,15 @@ public class TelegramCommandRouter {
                 """.trim();
     }
 
+    private static String welcomeText() {
+        return """
+                ¡Hola! Soy tu asistente financiero personal.
+                Te ayudo a registrar movimientos y consultar tu resumen.
+                """.trim();
+    }
+
     void sendMainMenu(String chatId) {
-        messageSender.sendText(chatId, menuText(), buildMainMenuInlineKeyboard());
+        messageSender.sendText(chatId, welcomeText() + "\n\n" + menuText(), buildMainMenuInlineKeyboard());
     }
 
     private void sendAccountsMenu(String chatId) {
