@@ -126,11 +126,21 @@ public class TelegramQuickReplyService {
                     .append(" | usado ").append(fmt(c.usedAmount()))
                     .append(" | disponible ").append(fmt(c.availableCredit())).append("\n");
         }
-        sb.append("\nDeudas activas (total pendiente): ");
-        BigDecimal total = debtService.listActiveDebts().stream()
+        var debts = debtService.listActiveDebts();
+        BigDecimal total = debts.stream()
                 .map(DebtResponse::pendingAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        sb.append(fmt(total));
+        sb.append("\nDeudas activas (total pendiente: ").append(fmt(total)).append("):\n");
+        for (DebtResponse d : debts) {
+            sb.append("- ")
+                    .append(d.name())
+                    .append(" | pendiente ").append(fmt(d.pendingAmount()))
+                    .append(" | estado ").append(d.status());
+            if (d.dueDate() != null) {
+                sb.append(" | vence ").append(d.dueDate());
+            }
+            sb.append("\n");
+        }
         return sb.toString().trim();
     }
 
