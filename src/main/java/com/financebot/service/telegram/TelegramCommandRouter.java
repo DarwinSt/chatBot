@@ -71,8 +71,7 @@ public class TelegramCommandRouter {
             "action:card_delete",
             "action:category_create",
             "action:category_edit",
-            "action:category_delete",
-            "action:category_view"
+            "action:category_delete"
     );
 
     private final TelegramSessionService sessionService;
@@ -242,15 +241,6 @@ public class TelegramCommandRouter {
                 sendCategoriesMenu(chatId);
                 yield true;
             }
-            case "👀 ver categorías" -> {
-                messageSender.sendText(chatId, """
-                        Categorías por tipo:
-                        /categoria_ver_ingreso
-                        /categoria_ver_gasto
-                        /categoria_ver_deuda
-                        """.trim());
-                yield true;
-            }
             case "/categoria_crear" -> {
                 conversationService.beginCategoryCreateFlow(chatId, fresh, "/categoria_crear");
                 yield true;
@@ -338,7 +328,6 @@ public class TelegramCommandRouter {
             case "action:category_create" -> dispatch(chatId, session, "/categoria_crear");
             case "action:category_edit" -> dispatch(chatId, session, "/categoria_editar");
             case "action:category_delete" -> dispatch(chatId, session, "/categoria_eliminar");
-            case "action:category_view" -> dispatch(chatId, session, "👀 ver categorías");
             default -> false;
         };
     }
@@ -372,6 +361,10 @@ public class TelegramCommandRouter {
     }
 
     void sendMainMenu(String chatId) {
+        // Si quedó un ReplyKeyboard viejo “pegado” en el cliente, lo ocultamos.
+        // Telegram no permite combinar remove_keyboard con inline_keyboard en el mismo mensaje,
+        // así que enviamos primero un mensaje mínimo para ocultarlo y luego el menú inline.
+        messageSender.sendText(chatId, " ", Map.of("remove_keyboard", true));
         messageSender.sendText(chatId, welcomeText() + "\n\n" + menuText(), buildMainMenuInlineKeyboard());
     }
 
@@ -437,8 +430,7 @@ public class TelegramCommandRouter {
     private static Map<String, Object> buildCategoriesMenuInlineKeyboard() {
         return Map.of(
                 "inline_keyboard", List.of(
-                        List.of(Map.of("text", "👀 Ver categorías", "callback_data", "action:category_view"),
-                                Map.of("text", "➕ Agregar categoría", "callback_data", "action:category_create")),
+                        List.of(Map.of("text", "➕ Agregar categoría", "callback_data", "action:category_create")),
                         List.of(Map.of("text", "✏️ Editar categoría", "callback_data", "action:category_edit"),
                                 Map.of("text", "🗑️ Eliminar categoría", "callback_data", "action:category_delete")),
                         List.of(Map.of("text", "⬅️ Volver", "callback_data", "menu:main"),
