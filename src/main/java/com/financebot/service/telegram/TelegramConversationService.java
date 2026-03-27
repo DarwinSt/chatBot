@@ -351,9 +351,9 @@ public class TelegramConversationService {
         messageSender.sendText(chatId, """
                 Crear categoría - Paso 1/2
                 Tipo:
-                1) INCOME
-                2) EXPENSE
-                3) DEBT
+                1) INGRESO
+                2) GASTO
+                3) DEUDA
                 """.trim());
     }
 
@@ -366,9 +366,9 @@ public class TelegramConversationService {
         messageSender.sendText(chatId, """
                 Editar categoría - Paso 1/3
                 Tipo:
-                1) INCOME
-                2) EXPENSE
-                3) DEBT
+                1) INGRESO
+                2) GASTO
+                3) DEUDA
                 """.trim());
     }
 
@@ -381,9 +381,9 @@ public class TelegramConversationService {
         messageSender.sendText(chatId, """
                 Eliminar categoría - Paso 1/3
                 Tipo:
-                1) INCOME
-                2) EXPENSE
-                3) DEBT
+                1) INGRESO
+                2) GASTO
+                3) DEUDA
                 """.trim());
     }
 
@@ -813,7 +813,7 @@ public class TelegramConversationService {
                 List<CategoryRefResponse> categories = categoryService.listActiveByType(type);
                 if (categories.isEmpty()) {
                     sessionService.resetToIdle(session);
-                    messageSender.sendText(chatId, "No hay categorías activas de tipo " + type + ".");
+                    messageSender.sendText(chatId, "No hay categorías activas de tipo " + categoryTypeLabel(type) + ".");
                     return;
                 }
                 ctx.fields.put("type", type.name());
@@ -859,7 +859,7 @@ public class TelegramConversationService {
                 List<CategoryRefResponse> categories = categoryService.listActiveByType(type);
                 if (categories.isEmpty()) {
                     sessionService.resetToIdle(session);
-                    messageSender.sendText(chatId, "No hay categorías activas de tipo " + type + ".");
+                    messageSender.sendText(chatId, "No hay categorías activas de tipo " + categoryTypeLabel(type) + ".");
                     return;
                 }
                 ctx.fields.put("type", type.name());
@@ -1443,10 +1443,18 @@ public class TelegramConversationService {
     private CategoryType parseCategoryType(String input) {
         String t = input.trim().toUpperCase(Locale.ROOT);
         return switch (t) {
-            case "1", "INCOME" -> CategoryType.INCOME;
-            case "2", "EXPENSE" -> CategoryType.EXPENSE;
-            case "3", "DEBT" -> CategoryType.DEBT;
+            case "1", "INCOME", "INGRESO", "INGRESOS" -> CategoryType.INCOME;
+            case "2", "EXPENSE", "GASTO", "GASTOS" -> CategoryType.EXPENSE;
+            case "3", "DEBT", "DEUDA", "DEUDAS", "DEBIT", "DEBITO" -> CategoryType.DEBT;
             default -> null;
+        };
+    }
+
+    private String categoryTypeLabel(CategoryType type) {
+        return switch (type) {
+            case INCOME -> "INGRESO";
+            case EXPENSE -> "GASTO";
+            case DEBT -> "DEUDA";
         };
     }
 

@@ -361,31 +361,38 @@ public class TelegramCommandRouter {
     }
 
     void sendMainMenu(String chatId) {
-        // Si quedó un ReplyKeyboard viejo “pegado” en el cliente, lo ocultamos.
-        // Telegram no permite combinar remove_keyboard con inline_keyboard en el mismo mensaje,
-        // así que enviamos primero un mensaje mínimo para ocultarlo y luego el menú inline.
-        messageSender.sendText(chatId, " ", Map.of("remove_keyboard", true));
+        hideLegacyReplyKeyboard(chatId);
         messageSender.sendText(chatId, welcomeText() + "\n\n" + menuText(), buildMainMenuInlineKeyboard());
     }
 
     private void sendAccountsMenu(String chatId) {
+        hideLegacyReplyKeyboard(chatId);
         messageSender.sendText(chatId, "Cuentas: elige una opción.", buildAccountsMenuInlineKeyboard());
     }
 
     private void sendCardsMenu(String chatId) {
+        hideLegacyReplyKeyboard(chatId);
         messageSender.sendText(chatId, "Tarjetas: elige una opción.", buildCardsMenuInlineKeyboard());
     }
 
     private void sendCategoriesMenu(String chatId) {
+        hideLegacyReplyKeyboard(chatId);
         messageSender.sendText(chatId, "Categorías: elige una opción.", buildCategoriesMenuInlineKeyboard());
     }
 
     private void sendMovementsMenu(String chatId) {
+        hideLegacyReplyKeyboard(chatId);
         messageSender.sendText(chatId, "Movimientos: elige una opción.", buildMovementsMenuInlineKeyboard());
     }
 
     private void sendReportsMenu(String chatId) {
+        hideLegacyReplyKeyboard(chatId);
         messageSender.sendText(chatId, "Resumen y consultas: elige una opción.", buildReportsMenuInlineKeyboard());
+    }
+
+    private void hideLegacyReplyKeyboard(String chatId) {
+        // Caracter invisible para forzar remove_keyboard sin ensuciar el chat.
+        messageSender.sendText(chatId, "\u200B", Map.of("remove_keyboard", true));
     }
 
     private static Map<String, Object> buildMainMenuInlineKeyboard() {
