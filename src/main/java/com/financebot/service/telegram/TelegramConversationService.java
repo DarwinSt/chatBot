@@ -159,7 +159,7 @@ public class TelegramConversationService {
 
     @Transactional
     public void beginExpenseFlow(String chatId, TelegramChatSession session, String pendingCommand) {
-        List<CategoryRefResponse> expenseCategories = categoryService.listActiveByType(CategoryType.EXPENSE);
+        List<CategoryRefResponse> expenseCategories = categoryService.listActiveByType(CategoryType.GASTO);
         if (expenseCategories.isEmpty()) {
             messageSender.sendText(chatId, "No hay categorías de gasto activas. Crea categorías antes.");
             return;
@@ -174,7 +174,7 @@ public class TelegramConversationService {
 
     @Transactional
     public void beginIncomeFlow(String chatId, TelegramChatSession session, String pendingCommand) {
-        if (categoryService.listActiveByType(CategoryType.INCOME).isEmpty()) {
+        if (categoryService.listActiveByType(CategoryType.INGRESO).isEmpty()) {
             messageSender.sendText(chatId, "No hay categorías de ingreso activas.");
             return;
         }
@@ -200,7 +200,7 @@ public class TelegramConversationService {
 
     @Transactional
     public void beginCardConsumptionFlow(String chatId, TelegramChatSession session, String pendingCommand) {
-        if (categoryService.listActiveByType(CategoryType.EXPENSE).isEmpty()) {
+        if (categoryService.listActiveByType(CategoryType.GASTO).isEmpty()) {
             messageSender.sendText(chatId, "No hay categorías de gasto activas.");
             return;
         }
@@ -400,10 +400,10 @@ public class TelegramConversationService {
                 messageSender.sendText(chatId, """
                         Crear cuenta - Paso 2/4
                         Tipo de cuenta:
-                        1) CHECKING
-                        2) SAVINGS
-                        3) CASH
-                        4) DIGITAL_WALLET
+                        1) CORRIENTE
+                        2) AHORROS
+                        3) EFECTIVO
+                        4) BILLETERA_DIGITAL
                         """.trim());
             }
             case STEP_ACCOUNT_TYPE -> {
@@ -432,7 +432,7 @@ public class TelegramConversationService {
                 String notes = "-".equals(input) ? null : input.trim();
                 accountService.create(new AccountCreateRequest(
                         ctx.fields.get("name"),
-                        AccountType.valueOf(ctx.fields.get("type")),
+                        AccountType.fromString(ctx.fields.get("type")),
                         new BigDecimal(ctx.fields.get("initialBalance")),
                         notes,
                         true
@@ -548,10 +548,10 @@ public class TelegramConversationService {
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
                 messageSender.sendText(chatId, """
                         Paso 3/5 - Tipo (1-4) o '-' para mantener:
-                        1) CHECKING
-                        2) SAVINGS
-                        3) CASH
-                        4) DIGITAL_WALLET
+                        1) CORRIENTE
+                        2) AHORROS
+                        3) EFECTIVO
+                        4) BILLETERA_DIGITAL
                         """.trim());
             }
             case STEP_ACCOUNT_TYPE -> {
@@ -590,7 +590,7 @@ public class TelegramConversationService {
                 accountService.updateBasic(
                         Long.parseLong(ctx.fields.get("accountId")),
                         ctx.fields.get("name"),
-                        AccountType.valueOf(ctx.fields.get("type")),
+                        AccountType.fromString(ctx.fields.get("type")),
                         ctx.fields.get("notes").isBlank() ? null : ctx.fields.get("notes"),
                         Boolean.parseBoolean(ctx.fields.get("active"))
                 );
@@ -794,7 +794,7 @@ public class TelegramConversationService {
                 messageSender.sendText(chatId, "Crear categoría - Paso 2/2\nNombre:");
             }
             case STEP_NAME -> {
-                var created = categoryService.create(input, CategoryType.valueOf(ctx.fields.get("type")));
+                var created = categoryService.create(input, CategoryType.fromString(ctx.fields.get("type")));
                 sessionService.resetToIdle(session);
                 messageSender.sendText(chatId, "Categoría creada: " + created.name() + " (" + created.type() + ")");
             }
@@ -813,7 +813,7 @@ public class TelegramConversationService {
                 List<CategoryRefResponse> categories = categoryService.listActiveByType(type);
                 if (categories.isEmpty()) {
                     sessionService.resetToIdle(session);
-                    messageSender.sendText(chatId, "No hay categorías activas de tipo " + categoryTypeLabel(type) + ".");
+                    messageSender.sendText(chatId, "No hay categorías activas de tipo " + type.name() + ".");
                     return;
                 }
                 ctx.fields.put("type", type.name());
@@ -822,7 +822,7 @@ public class TelegramConversationService {
                 messageSender.sendText(chatId, "Editar categoría - Paso 2/3\nElige por número:\n" + formatCategories(categories));
             }
             case STEP_CATEGORY -> {
-                List<CategoryRefResponse> categories = categoryService.listActiveByType(CategoryType.valueOf(ctx.fields.get("type")));
+                List<CategoryRefResponse> categories = categoryService.listActiveByType(CategoryType.fromString(ctx.fields.get("type")));
                 var idx = TelegramParsingUtils.parsePositiveInt(input);
                 if (idx.isEmpty() || idx.get() > categories.size()) {
                     messageSender.sendText(chatId, "Número inválido.");
@@ -838,7 +838,7 @@ public class TelegramConversationService {
                 var updated = categoryService.update(
                         Long.parseLong(ctx.fields.get("categoryId")),
                         input,
-                        CategoryType.valueOf(ctx.fields.get("type")),
+                        CategoryType.fromString(ctx.fields.get("type")),
                         true
                 );
                 sessionService.resetToIdle(session);
@@ -859,7 +859,7 @@ public class TelegramConversationService {
                 List<CategoryRefResponse> categories = categoryService.listActiveByType(type);
                 if (categories.isEmpty()) {
                     sessionService.resetToIdle(session);
-                    messageSender.sendText(chatId, "No hay categorías activas de tipo " + categoryTypeLabel(type) + ".");
+                    messageSender.sendText(chatId, "No hay categorías activas de tipo " + type.name() + ".");
                     return;
                 }
                 ctx.fields.put("type", type.name());
@@ -868,7 +868,7 @@ public class TelegramConversationService {
                 messageSender.sendText(chatId, "Eliminar categoría - Paso 2/3\nElige por número:\n" + formatCategories(categories));
             }
             case STEP_CATEGORY -> {
-                List<CategoryRefResponse> categories = categoryService.listActiveByType(CategoryType.valueOf(ctx.fields.get("type")));
+                List<CategoryRefResponse> categories = categoryService.listActiveByType(CategoryType.fromString(ctx.fields.get("type")));
                 var idx = TelegramParsingUtils.parsePositiveInt(input);
                 if (idx.isEmpty() || idx.get() > categories.size()) {
                     messageSender.sendText(chatId, "Número inválido.");
@@ -1070,10 +1070,10 @@ public class TelegramConversationService {
                 ctx.fields.put("amount", amt.get().toPlainString());
                 ctx.step = STEP_CATEGORY;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Categoría (número):\n" + formatCategories(categoryService.listActiveByType(CategoryType.INCOME)));
+                messageSender.sendText(chatId, "Categoría (número):\n" + formatCategories(categoryService.listActiveByType(CategoryType.INGRESO)));
             }
             case STEP_CATEGORY -> {
-                List<CategoryRefResponse> cats = categoryService.listActiveByType(CategoryType.INCOME);
+                List<CategoryRefResponse> cats = categoryService.listActiveByType(CategoryType.INGRESO);
                 var idx = TelegramParsingUtils.parsePositiveInt(input);
                 if (idx.isEmpty() || idx.get() > cats.size()) {
                     messageSender.sendText(chatId, "Número inválido.");
@@ -1170,12 +1170,12 @@ public class TelegramConversationService {
                 ctx.step = STEP_DEBT_CATEGORY;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
                 messageSender.sendText(chatId, "Categoría de deuda (número) o '-' para omitir:\n"
-                        + formatCategories(categoryService.listActiveByType(CategoryType.DEBT)));
+                        + formatCategories(categoryService.listActiveByType(CategoryType.DEUDA)));
             }
             case STEP_DEBT_CATEGORY -> {
                 Long categoryId = null;
                 if (!"-".equals(input)) {
-                    List<CategoryRefResponse> cats = categoryService.listActiveByType(CategoryType.DEBT);
+                    List<CategoryRefResponse> cats = categoryService.listActiveByType(CategoryType.DEUDA);
                     var idx = TelegramParsingUtils.parsePositiveInt(input);
                     if (idx.isEmpty() || idx.get() > cats.size()) {
                         messageSender.sendText(chatId, "Número inválido.");
@@ -1215,10 +1215,10 @@ public class TelegramConversationService {
                 ctx.fields.put("amount", amt.get().toPlainString());
                 ctx.step = STEP_CATEGORY;
                 sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Categoría (número):\n" + formatCategories(categoryService.listActiveByType(CategoryType.EXPENSE)));
+                messageSender.sendText(chatId, "Categoría (número):\n" + formatCategories(categoryService.listActiveByType(CategoryType.GASTO)));
             }
             case STEP_CATEGORY -> {
-                List<CategoryRefResponse> cats = categoryService.listActiveByType(CategoryType.EXPENSE);
+                List<CategoryRefResponse> cats = categoryService.listActiveByType(CategoryType.GASTO);
                 var idx = TelegramParsingUtils.parsePositiveInt(input);
                 if (idx.isEmpty() || idx.get() > cats.size()) {
                     messageSender.sendText(chatId, "Número inválido.");
@@ -1432,29 +1432,21 @@ public class TelegramConversationService {
     private AccountType parseAccountType(String input) {
         String t = input.trim().toUpperCase(Locale.ROOT);
         return switch (t) {
-            case "1", "CHECKING" -> AccountType.CHECKING;
-            case "2", "SAVINGS" -> AccountType.SAVINGS;
-            case "3", "CASH" -> AccountType.CASH;
-            case "4", "DIGITAL_WALLET", "DIGITAL-WALLET", "WALLET" -> AccountType.DIGITAL_WALLET;
-            default -> null;
+            case "1", "CORRIENTE", "CHECKING" -> AccountType.CORRIENTE;
+            case "2", "AHORROS", "SAVINGS" -> AccountType.AHORROS;
+            case "3", "EFECTIVO", "CASH" -> AccountType.EFECTIVO;
+            case "4", "BILLETERA_DIGITAL", "DIGITAL_WALLET", "DIGITAL-WALLET", "WALLET" -> AccountType.BILLETERA_DIGITAL;
+            default -> AccountType.fromString(t);
         };
     }
 
     private CategoryType parseCategoryType(String input) {
         String t = input.trim().toUpperCase(Locale.ROOT);
         return switch (t) {
-            case "1", "INCOME", "INGRESO", "INGRESOS" -> CategoryType.INCOME;
-            case "2", "EXPENSE", "GASTO", "GASTOS" -> CategoryType.EXPENSE;
-            case "3", "DEBT", "DEUDA", "DEUDAS", "DEBIT", "DEBITO" -> CategoryType.DEBT;
-            default -> null;
-        };
-    }
-
-    private String categoryTypeLabel(CategoryType type) {
-        return switch (type) {
-            case INCOME -> "INGRESO";
-            case EXPENSE -> "GASTO";
-            case DEBT -> "DEUDA";
+            case "1", "INGRESO", "INCOME", "INGRESOS" -> CategoryType.INGRESO;
+            case "2", "GASTO", "EXPENSE", "GASTOS" -> CategoryType.GASTO;
+            case "3", "DEUDA", "DEBT", "DEUDAS", "DEBIT", "DEBITO" -> CategoryType.DEUDA;
+            default -> CategoryType.fromString(t);
         };
     }
 

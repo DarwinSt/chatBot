@@ -114,7 +114,7 @@ public class TelegramCommandRouter {
         if ("/cancelar".equals(normalized)) {
             if (session.getCurrentState() == TelegramConversationState.CONVERSATION) {
                 sessionService.resetToIdle(session);
-                messageSender.sendText(chatId, "Conversación cancelada. Estado: IDLE.");
+                messageSender.sendText(chatId, "Conversación cancelada. Estado: INACTIVO.");
             } else {
                 messageSender.sendText(chatId, "No había una conversación activa.");
             }
@@ -483,13 +483,13 @@ public class TelegramCommandRouter {
             return;
         }
         try {
-            AccountType type = AccountType.valueOf(parts[1].trim().toUpperCase(Locale.ROOT));
+            AccountType type = AccountType.fromString(parts[1].trim());
             BigDecimal initial = new BigDecimal(parts[2].trim());
             AccountResponse created = accountService.create(new AccountCreateRequest(
                     parts[0].trim(), type, initial, emptyToNull(parts[3]), true));
             messageSender.sendText(chatId, "Cuenta creada: " + created.name() + " (id " + created.id() + ")");
         } catch (Exception e) {
-            messageSender.sendText(chatId, "No se pudo crear la cuenta. Verifica tipo (CHECKING/SAVINGS/CASH/DIGITAL_WALLET) y saldo.");
+            messageSender.sendText(chatId, "No se pudo crear la cuenta. Verifica tipo (CORRIENTE/AHORROS/EFECTIVO/BILLETERA_DIGITAL) y saldo.");
         }
     }
 
@@ -501,7 +501,7 @@ public class TelegramCommandRouter {
         }
         try {
             Long id = Long.parseLong(parts[0].trim());
-            AccountType type = AccountType.valueOf(parts[2].trim().toUpperCase(Locale.ROOT));
+            AccountType type = AccountType.fromString(parts[2].trim());
             boolean active = "1".equals(parts[3].trim()) || "true".equalsIgnoreCase(parts[3].trim());
             AccountResponse updated = accountService.updateBasic(id, parts[1].trim(), type, emptyToNull(parts[4]), active);
             messageSender.sendText(chatId, "Cuenta actualizada: " + updated.name());

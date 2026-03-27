@@ -27,7 +27,7 @@ public class TelegramSessionService {
         return repository.findByChatId(chatIdValue).orElseGet(() -> {
             TelegramChatSession session = new TelegramChatSession();
             session.setChatId(chatIdValue);
-            session.setCurrentState(TelegramConversationState.IDLE);
+            session.setCurrentState(TelegramConversationState.INACTIVO);
             session.setActive(true);
             return repository.save(session);
         });
@@ -61,7 +61,7 @@ public class TelegramSessionService {
 
     @Transactional
     public void resetToIdle(TelegramChatSession session) {
-        session.setCurrentState(TelegramConversationState.IDLE);
+        session.setCurrentState(TelegramConversationState.INACTIVO);
         session.setPendingCommand(null);
         session.setContextData(null);
         repository.save(session);

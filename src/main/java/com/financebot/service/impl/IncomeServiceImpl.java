@@ -64,7 +64,7 @@ public class IncomeServiceImpl implements IncomeService {
         MoneyUtils.assertPositive(amount);
 
         Category category = categoryRepository
-                .findByIdAndTypeAndActiveTrue(request.categoryId(), CategoryType.INCOME)
+                .findByIdAndTypeAndActiveTrue(request.categoryId(), CategoryType.INGRESO)
                 .orElseThrow(() -> new ResourceNotFoundException("Categoría de ingreso no encontrada o inválida"));
 
         Account account = accountRepository

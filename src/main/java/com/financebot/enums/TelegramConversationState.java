@@ -1,18 +1,13 @@
 package com.financebot.enums;
 
 /**
- * Estado general del chat para Telegram.
+ * Estado del chat en Telegram. Los literales coinciden con el enum PostgreSQL {@code telegram_conversation_state}.
  * <p>
- * La BD corporativa no incluye el literal {@code CONVERSATION}; por compatibilidad usamos
- * {@code WAITING_EXPENSE_AMOUNT} como marcador técnico de "hay conversación activa".
+ * {@link #CONVERSATION} es un alias de {@link #ESPERANDO_MONTO_GASTO} para marcar flujo activo.
  */
 public enum TelegramConversationState {
-    IDLE,
-    WAITING_EXPENSE_AMOUNT;
+    INACTIVO,
+    ESPERANDO_MONTO_GASTO;
 
-    /**
-     * Alias semántico usado por el código existente para indicar flujo activo.
-     * Se persiste como WAITING_EXPENSE_AMOUNT (valor válido en la BD actual).
-     */
-    public static final TelegramConversationState CONVERSATION = WAITING_EXPENSE_AMOUNT;
+    public static final TelegramConversationState CONVERSATION = ESPERANDO_MONTO_GASTO;
 }

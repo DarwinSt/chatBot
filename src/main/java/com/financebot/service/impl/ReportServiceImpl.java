@@ -246,7 +246,7 @@ public class ReportServiceImpl implements ReportService {
                 reminderRepository.findByActiveTrueAndReminderDateBetweenOrderByReminderDateAsc(today, monthEnd);
 
         List<Debt> debts = debtRepository.findUpcomingByDueDateBetween(
-                List.of(DebtStatus.ACTIVE, DebtStatus.OVERDUE),
+                List.of(DebtStatus.ACTIVA, DebtStatus.VENCIDA),
                 today,
                 monthEnd);
 

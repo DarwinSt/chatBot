@@ -8,42 +8,42 @@
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'account_type') THEN
-        CREATE TYPE account_type AS ENUM ('CHECKING', 'SAVINGS', 'CASH', 'DIGITAL_WALLET');
+        CREATE TYPE account_type AS ENUM ('CORRIENTE', 'AHORROS', 'EFECTIVO', 'BILLETERA_DIGITAL');
     END IF;
 END$$;
 
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'category_type') THEN
-        CREATE TYPE category_type AS ENUM ('INCOME', 'EXPENSE', 'DEBT');
+        CREATE TYPE category_type AS ENUM ('INGRESO', 'GASTO', 'DEUDA');
     END IF;
 END$$;
 
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'expense_type') THEN
-        CREATE TYPE expense_type AS ENUM ('FIXED', 'VARIABLE');
+        CREATE TYPE expense_type AS ENUM ('FIJO', 'VARIABLE');
     END IF;
 END$$;
 
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'debt_status') THEN
-        CREATE TYPE debt_status AS ENUM ('ACTIVE', 'PAID', 'OVERDUE', 'CANCELLED');
+        CREATE TYPE debt_status AS ENUM ('ACTIVA', 'PAGADA', 'VENCIDA', 'CANCELADA');
     END IF;
 END$$;
 
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'reminder_type') THEN
-        CREATE TYPE reminder_type AS ENUM ('DEBT_PAYMENT', 'CREDIT_CARD_PAYMENT', 'FIXED_EXPENSE', 'GENERAL');
+        CREATE TYPE reminder_type AS ENUM ('PAGO_DEUDA', 'PAGO_TARJETA', 'GASTO_FIJO', 'GENERAL');
     END IF;
 END$$;
 
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'telegram_conversation_state') THEN
-        CREATE TYPE telegram_conversation_state AS ENUM ('IDLE', 'WAITING_EXPENSE_AMOUNT');
+        CREATE TYPE telegram_conversation_state AS ENUM ('INACTIVO', 'ESPERANDO_MONTO_GASTO');
     END IF;
 END$$;
 
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS debts (
     due_date DATE,
     creditor VARCHAR(150),
     notes VARCHAR(500),
-    status debt_status NOT NULL DEFAULT 'ACTIVE',
+    status debt_status NOT NULL DEFAULT 'ACTIVA',
     category_id BIGINT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS reminders (
 CREATE TABLE IF NOT EXISTS telegram_chat_sessions (
     id BIGSERIAL PRIMARY KEY,
     chat_id BIGINT NOT NULL UNIQUE,
-    current_state telegram_conversation_state NOT NULL DEFAULT 'IDLE',
+    current_state telegram_conversation_state NOT NULL DEFAULT 'INACTIVO',
     pending_command VARCHAR(100),
     context_data TEXT,
     active BOOLEAN NOT NULL DEFAULT TRUE,

@@ -87,7 +87,7 @@ public class ExpenseServiceImpl implements ExpenseService {
         }
 
         Category category = categoryRepository
-                .findByIdAndTypeAndActiveTrue(request.categoryId(), CategoryType.EXPENSE)
+                .findByIdAndTypeAndActiveTrue(request.categoryId(), CategoryType.GASTO)
                 .orElseThrow(() -> new ResourceNotFoundException("Categoría de gasto no encontrada o inválida"));
 
         Expense expense = new Expense();

@@ -75,11 +75,11 @@ public class DebtServiceImpl implements DebtService {
         Category category = null;
         if (request.categoryId() != null) {
             category = categoryRepository
-                    .findByIdAndTypeAndActiveTrue(request.categoryId(), CategoryType.DEBT)
+                    .findByIdAndTypeAndActiveTrue(request.categoryId(), CategoryType.DEUDA)
                     .orElseThrow(() -> new ResourceNotFoundException("Categoría de deuda no encontrada o inválida"));
         }
 
-        DebtStatus status = request.status() != null ? request.status() : DebtStatus.ACTIVE;
+        DebtStatus status = request.status() != null ? request.status() : DebtStatus.ACTIVA;
 
         Debt debt = new Debt();
         debt.setName(request.name().trim());
@@ -118,7 +118,7 @@ public class DebtServiceImpl implements DebtService {
     public List<DebtResponse> listActiveDebts() {
         List<Debt> debts = debtRepository.findAllByPendingAmountGreaterThanAndStatusInOrderByDueDateAsc(
                 BigDecimal.ZERO,
-                List.of(DebtStatus.ACTIVE, DebtStatus.OVERDUE));
+                List.of(DebtStatus.ACTIVA, DebtStatus.VENCIDA));
         return debts.stream()
                 .map(this::syncOverdueState)
                 .map(debtMapper::toResponse)
@@ -135,7 +135,7 @@ public class DebtServiceImpl implements DebtService {
                 .orElseThrow(() -> new ResourceNotFoundException("Deuda no encontrada"));
         syncOverdueState(debt);
 
-        if (debt.getStatus() == DebtStatus.PAID || debt.getStatus() == DebtStatus.CANCELLED) {
+        if (debt.getStatus() == DebtStatus.PAGADA || debt.getStatus() == DebtStatus.CANCELADA) {
             throw new InvalidOperationException("No se puede abonar una deuda en estado " + debt.getStatus());
         }
 
@@ -158,7 +158,7 @@ public class DebtServiceImpl implements DebtService {
         BigDecimal newPending = MoneyUtils.atLeastZero(MoneyUtils.subtract(debt.getPendingAmount(), amount));
         debt.setPendingAmount(newPending);
         if (newPending.compareTo(BigDecimal.ZERO) == 0) {
-            debt.setStatus(DebtStatus.PAID);
+            debt.setStatus(DebtStatus.PAGADA);
         }
 
         DebtPayment payment = new DebtPayment();
@@ -190,14 +190,14 @@ public class DebtServiceImpl implements DebtService {
     @Override
     @Transactional
     public Debt syncOverdueState(Debt debt) {
-        if (debt.getStatus() == DebtStatus.PAID || debt.getStatus() == DebtStatus.CANCELLED) {
+        if (debt.getStatus() == DebtStatus.PAGADA || debt.getStatus() == DebtStatus.CANCELADA) {
             return debt;
         }
         if (debt.getDueDate() != null
                 && debt.getPendingAmount().compareTo(BigDecimal.ZERO) > 0
                 && LocalDate.now().isAfter(debt.getDueDate())
-                && debt.getStatus() == DebtStatus.ACTIVE) {
-            debt.setStatus(DebtStatus.OVERDUE);
+                && debt.getStatus() == DebtStatus.ACTIVA) {
+            debt.setStatus(DebtStatus.VENCIDA);
             return debtRepository.save(debt);
         }
         return debt;

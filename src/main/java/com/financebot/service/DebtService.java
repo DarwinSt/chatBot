@@ -24,7 +24,7 @@ public interface DebtService {
     DebtPaymentResponse registerPayment(Long debtId, DebtPaymentRequest request);
 
     /**
-     * Si la deuda está vencida y aún hay saldo pendiente, actualiza el estado a {@code OVERDUE}.
+     * Si la deuda está vencida y aún hay saldo pendiente, actualiza el estado a {@code VENCIDA}.
      */
     Debt syncOverdueState(Debt debt);
 }
