@@ -1,3 +1,12 @@
+# Producción / Railway
+# ───────────────────
+# Opción A (recomendada con app en Railway): en el servicio Java, referencia las variables del plugin Postgres
+#   PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD (Railway las rellena solo).
+# Opción B: define una sola variable JDBC (desde tu PC o si prefieres URL fija):
+#   SPRING_DATASOURCE_URL=jdbc:postgresql://HOST:PUERTO/NOMBRE_BD
+#   SPRING_DATASOURCE_USERNAME=postgres
+#   SPRING_DATASOURCE_PASSWORD=...
+# URL pública Railway (proxy): solo para conectar DESDE FUERA (tu laptop). Dentro de Railway usa PGHOST *.internal.
 spring:
   config:
     activate:
@@ -5,9 +14,9 @@ spring:
   application:
     name: financebot
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/financesbot}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:financesbot}}
+    username: ${SPRING_DATASOURCE_USERNAME:${PGUSER:postgres}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${PGPASSWORD:}}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -20,8 +29,9 @@ spring:
         jdbc:
           time_zone: UTC
 
+# Railway (y otros PaaS) suelen definir PORT; SERVER_PORT sigue siendo válido en local.
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${PORT:${SERVER_PORT:8080}}
 
 app:
   telegram:
