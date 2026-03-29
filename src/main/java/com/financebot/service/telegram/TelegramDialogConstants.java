@@ -5,7 +5,6 @@ public final class TelegramDialogConstants {
     public static final String FLOW_EXPENSE = "EXPENSE";
     public static final String FLOW_INCOME = "INCOME";
     public static final String FLOW_DEBT_REGISTER = "DEBT_REGISTER";
-    public static final String FLOW_CARD_CONSUMPTION = "CARD_CONSUMPTION";
     public static final String FLOW_CARD_PAYMENT = "CARD_PAYMENT";
     public static final String FLOW_CARD_CREATE = "CARD_CREATE";
     public static final String FLOW_CARD_EDIT = "CARD_EDIT";

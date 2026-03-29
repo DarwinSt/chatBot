@@ -29,7 +29,6 @@ public class TelegramCommandRouter {
             "/registrar_gasto",
             "/registrar_ingreso",
             "/registrar_deuda",
-            "/registrar_consumo_tarjeta",
             "/pagar_tarjeta",
             "/abonar_deuda",
             "/transferir",
@@ -54,7 +53,6 @@ public class TelegramCommandRouter {
             "action:expense",
             "action:income",
             "action:debt_register",
-            "action:card_consumption",
             "action:card_payment",
             "action:debt_payment",
             "action:transfer",
@@ -205,10 +203,6 @@ public class TelegramCommandRouter {
                 conversationService.beginDebtRegisterFlow(chatId, fresh, normalized);
                 yield true;
             }
-            case "/registrar_consumo_tarjeta" -> {
-                conversationService.beginCardConsumptionFlow(chatId, fresh, normalized);
-                yield true;
-            }
             case "/pagar_tarjeta" -> {
                 conversationService.beginCardPaymentFlow(chatId, fresh, normalized);
                 yield true;
@@ -310,7 +304,6 @@ public class TelegramCommandRouter {
             case "action:expense" -> dispatch(chatId, session, "/registrar_gasto");
             case "action:income" -> dispatch(chatId, session, "/registrar_ingreso");
             case "action:debt_register" -> dispatch(chatId, session, "/registrar_deuda");
-            case "action:card_consumption" -> dispatch(chatId, session, "/registrar_consumo_tarjeta");
             case "action:card_payment" -> dispatch(chatId, session, "/pagar_tarjeta");
             case "action:debt_payment" -> dispatch(chatId, session, "/abonar_deuda");
             case "action:transfer" -> dispatch(chatId, session, "/transferir");
@@ -452,10 +445,9 @@ public class TelegramCommandRouter {
                         List.of(Map.of("text", "➕ Registrar gasto", "callback_data", "action:expense"),
                                 Map.of("text", "💰 Registrar ingreso", "callback_data", "action:income")),
                         List.of(Map.of("text", "🧾 Registrar deuda", "callback_data", "action:debt_register"),
-                                Map.of("text", "💳 Consumo tarjeta", "callback_data", "action:card_consumption")),
-                        List.of(Map.of("text", "🏦 Pagar tarjeta", "callback_data", "action:card_payment"),
-                                Map.of("text", "📉 Abonar deuda", "callback_data", "action:debt_payment")),
-                        List.of(Map.of("text", "🔁 Transferir", "callback_data", "action:transfer")),
+                                Map.of("text", "🏦 Pagar tarjeta", "callback_data", "action:card_payment")),
+                        List.of(Map.of("text", "📉 Abonar deuda", "callback_data", "action:debt_payment"),
+                                Map.of("text", "🔁 Transferir", "callback_data", "action:transfer")),
                         List.of(Map.of("text", "⬅️ Volver", "callback_data", "menu:main"),
                                 Map.of("text", "❌ Cancelar", "callback_data", "menu:cancel"))
                 )

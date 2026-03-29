@@ -46,7 +46,6 @@ import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CATEGORY_CREATE;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CATEGORY_DELETE;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CATEGORY_EDIT;
-import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_CONSUMPTION;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_CARD_PAYMENT;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_DEBT_PAYMENT;
 import static com.financebot.service.telegram.TelegramDialogConstants.FLOW_DEBT_REGISTER;
@@ -141,7 +140,6 @@ public class TelegramConversationService {
                 case FLOW_EXPENSE -> handleExpense(chatId, session, ctx, input);
                 case FLOW_INCOME -> handleIncome(chatId, session, ctx, input);
                 case FLOW_DEBT_REGISTER -> handleDebtRegister(chatId, session, ctx, input);
-                case FLOW_CARD_CONSUMPTION -> handleCardConsumption(chatId, session, ctx, input);
                 case FLOW_CARD_PAYMENT -> handleCardPayment(chatId, session, ctx, input);
                 case FLOW_DEBT_PAYMENT -> handleDebtPayment(chatId, session, ctx, input);
                 case FLOW_TRANSFER -> handleTransfer(chatId, session, ctx, input);
@@ -196,23 +194,6 @@ public class TelegramConversationService {
         ctx.step = STEP_NAME;
         sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
         messageSender.sendText(chatId, "Nombre de la deuda:");
-    }
-
-    @Transactional
-    public void beginCardConsumptionFlow(String chatId, TelegramChatSession session, String pendingCommand) {
-        if (categoryService.listActiveByType(CategoryType.GASTO).isEmpty()) {
-            messageSender.sendText(chatId, "No hay categorías de gasto activas.");
-            return;
-        }
-        if (creditCardService.listActive().isEmpty()) {
-            messageSender.sendText(chatId, "No hay tarjetas activas.");
-            return;
-        }
-        TelegramContextPayload ctx = new TelegramContextPayload();
-        ctx.flow = FLOW_CARD_CONSUMPTION;
-        ctx.step = STEP_AMOUNT;
-        sessionService.save(session, TelegramConversationState.CONVERSATION, pendingCommand, ctx);
-        messageSender.sendText(chatId, "Monto del consumo con tarjeta:");
     }
 
     @Transactional
@@ -1199,61 +1180,6 @@ public class TelegramConversationService {
                         categoryId));
                 sessionService.resetToIdle(session);
                 messageSender.sendText(chatId, "Deuda registrada correctamente.");
-            }
-            default -> resetUnknown(chatId, session);
-        }
-    }
-
-    private void handleCardConsumption(String chatId, TelegramChatSession session, TelegramContextPayload ctx, String input) {
-        switch (ctx.step) {
-            case STEP_AMOUNT -> {
-                var amt = TelegramParsingUtils.parseAmount(input);
-                if (amt.isEmpty()) {
-                    messageSender.sendText(chatId, "Monto inválido.");
-                    return;
-                }
-                ctx.fields.put("amount", amt.get().toPlainString());
-                ctx.step = STEP_CATEGORY;
-                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Categoría (número):\n" + formatCategories(categoryService.listActiveByType(CategoryType.GASTO)));
-            }
-            case STEP_CATEGORY -> {
-                List<CategoryRefResponse> cats = categoryService.listActiveByType(CategoryType.GASTO);
-                var idx = TelegramParsingUtils.parsePositiveInt(input);
-                if (idx.isEmpty() || idx.get() > cats.size()) {
-                    messageSender.sendText(chatId, "Número inválido.");
-                    return;
-                }
-                ctx.fields.put("categoryId", String.valueOf(cats.get(idx.get() - 1).id()));
-                ctx.fields.put("date", LocalDate.now().toString());
-                ctx.step = STEP_CARD;
-                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Fecha del consumo: hoy.\nTarjeta (número):\n" + formatCards(creditCardService.listActive()));
-            }
-            case STEP_CARD -> {
-                List<CreditCardResponse> cards = creditCardService.listActive();
-                var idx = TelegramParsingUtils.parsePositiveInt(input);
-                if (idx.isEmpty() || idx.get() > cards.size()) {
-                    messageSender.sendText(chatId, "Número inválido.");
-                    return;
-                }
-                ctx.fields.put("cardId", String.valueOf(cards.get(idx.get() - 1).id()));
-                ctx.step = STEP_DESCRIPTION;
-                sessionService.save(session, TelegramConversationState.CONVERSATION, session.getPendingCommand(), ctx);
-                messageSender.sendText(chatId, "Descripción opcional (o '-'):");
-            }
-            case STEP_DESCRIPTION -> {
-                String notes = "-".equals(input) ? null : input;
-                expenseService.create(new ExpenseCreateRequest(
-                        new BigDecimal(ctx.fields.get("amount")),
-                        LocalDate.parse(ctx.fields.get("date")),
-                        "Telegram",
-                        notes,
-                        Long.parseLong(ctx.fields.get("categoryId")),
-                        null,
-                        Long.parseLong(ctx.fields.get("cardId"))));
-                sessionService.resetToIdle(session);
-                messageSender.sendText(chatId, "Consumo con tarjeta registrado.");
             }
             default -> resetUnknown(chatId, session);
         }
