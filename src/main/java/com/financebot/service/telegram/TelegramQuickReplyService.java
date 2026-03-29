@@ -8,6 +8,7 @@ import com.financebot.service.AccountService;
 import com.financebot.service.CreditCardService;
 import com.financebot.service.DebtService;
 import com.financebot.service.ReportService;
+import com.financebot.util.CreditCardPaymentSchedule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -26,6 +31,8 @@ public class TelegramQuickReplyService {
 
     private static final Logger log = LoggerFactory.getLogger(TelegramQuickReplyService.class);
     private static final DecimalFormat MONEY_FMT;
+    private static final DateTimeFormatter FECHA_CORTA =
+            DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.forLanguageTag("es-CO"));
 
     static {
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.forLanguageTag("es-CO"));
@@ -65,11 +72,7 @@ public class TelegramQuickReplyService {
     public String verDeudas() {
         StringBuilder sb = new StringBuilder();
         sb.append("Deudas activas:\n");
-        for (DebtResponse d : debtService.listActiveDebts()) {
-            sb.append("- ").append(d.name())
-                    .append(" → pendiente ").append(fmt(d.pendingAmount()))
-                    .append(" (").append(d.status()).append(")\n");
-        }
+        appendDeudasFormatoBloque(sb, debtService.listActiveDebts());
         return sb.toString().trim();
     }
 
@@ -77,12 +80,7 @@ public class TelegramQuickReplyService {
     public String verTarjetas() {
         StringBuilder sb = new StringBuilder();
         sb.append("Tarjetas activas:\n");
-        for (var c : creditCardService.listActive()) {
-            sb.append("- ").append(c.name())
-                    .append(" | cupo ").append(fmt(c.totalLimit()))
-                    .append(" | usado ").append(fmt(c.usedAmount()))
-                    .append(" | disponible ").append(fmt(c.availableCredit())).append("\n");
-        }
+        appendTarjetasFormatoBloque(sb, creditCardService.listActive());
         return sb.toString().trim();
     }
 
@@ -121,31 +119,98 @@ public class TelegramQuickReplyService {
             }
         }
         sb.append("\nTarjetas:\n");
-        for (CreditCardResponse c : creditCardService.listActive()) {
-            sb.append("- ").append(c.name())
-                    .append(" | usado ").append(fmt(c.usedAmount()))
-                    .append(" | disponible ").append(fmt(c.availableCredit())).append("\n");
-        }
+        appendTarjetasFormatoBloque(sb, creditCardService.listActive());
         var debts = debtService.listActiveDebts();
         BigDecimal total = debts.stream()
                 .map(DebtResponse::pendingAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         sb.append("\nDeudas activas (total pendiente: ").append(fmt(total)).append("):\n");
-        for (DebtResponse d : debts) {
-            sb.append("- ")
-                    .append(d.name())
-                    .append(" | pendiente ").append(fmt(d.pendingAmount()))
-                    .append(" | estado ").append(d.status());
-            if (d.dueDate() != null) {
-                sb.append(" | vence ").append(d.dueDate());
-            }
-            sb.append("\n");
-        }
+        appendDeudasFormatoBloque(sb, debts);
         return sb.toString().trim();
     }
 
     private String fmt(BigDecimal value) {
         BigDecimal safe = value == null ? BigDecimal.ZERO : value;
         return MONEY_FMT.format(safe);
+    }
+
+    private void appendTarjetasFormatoBloque(StringBuilder sb, List<CreditCardResponse> cards) {
+        if (cards.isEmpty()) {
+            sb.append("(No hay tarjetas activas.)\n");
+            return;
+        }
+        boolean first = true;
+        for (CreditCardResponse c : cards) {
+            if (!first) {
+                sb.append('\n');
+            }
+            first = false;
+            appendTarjetaBloque(sb, c);
+        }
+    }
+
+    /**
+     * Formato tipo:
+     * <pre>
+     * *(Nombre)*:
+     * Cupo total:
+     * Cupo usado:
+     * Disponible:
+     * Fecha de pago:
+     * </pre>
+     */
+    private void appendTarjetaBloque(StringBuilder sb, CreditCardResponse c) {
+        sb.append(c.name()).append(":\n");
+        sb.append("- Cupo total: ").append(fmt(c.totalLimit())).append('\n');
+        sb.append("- Cupo usado: ").append(fmt(c.usedAmount())).append('\n');
+        sb.append("- Disponible: ").append(fmt(c.availableCredit())).append('\n');
+        sb.append("- Fecha de pago: ").append(textoFechaPagoTarjeta(c)).append('\n');
+    }
+
+    private String textoFechaPagoTarjeta(CreditCardResponse c) {
+        if (c.paymentDueDay() == null) {
+            return "(sin día configurado)";
+        }
+        LocalDate proximo = CreditCardPaymentSchedule.nextPaymentDueDate(LocalDate.now(), c.paymentDueDay());
+        if (proximo == null) {
+            return "(día inválido)";
+        }
+        return proximo.format(FECHA_CORTA) + " (día " + c.paymentDueDay() + " del mes)";
+    }
+
+    private void appendDeudasFormatoBloque(StringBuilder sb, List<DebtResponse> debts) {
+        if (debts.isEmpty()) {
+            sb.append("(No hay deudas activas.)\n");
+            return;
+        }
+        boolean first = true;
+        for (DebtResponse d : debts) {
+            if (!first) {
+                sb.append('\n');
+            }
+            first = false;
+            appendDeudaBloque(sb, d);
+        }
+    }
+
+    /**
+     * Formato tipo:
+     * <pre>
+     * (Nombre):
+     * - Pendiente:
+     * - Acreedor:
+     * </pre>
+     */
+    private void appendDeudaBloque(StringBuilder sb, DebtResponse d) {
+        sb.append(d.name()).append(":\n");
+        sb.append("- Pendiente: ").append(fmt(d.pendingAmount())).append('\n');
+        sb.append("- Acreedor: ").append(textoAcreedor(d.creditor())).append('\n');
+    }
+
+    private String textoAcreedor(String creditor) {
+        if (creditor == null || creditor.isBlank()) {
+            return "(sin acreedor)";
+        }
+        return creditor.trim();
     }
 }
