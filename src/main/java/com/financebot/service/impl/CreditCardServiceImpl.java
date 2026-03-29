@@ -128,6 +128,11 @@ public class CreditCardServiceImpl implements CreditCardService {
         if (!card.isActive()) {
             throw new InvalidOperationException("La tarjeta de crédito no está activa");
         }
+        BigDecimal used = MoneyUtils.normalize(card.getUsedAmount());
+        if (used.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException(
+                    "No puedes registrar un pago: la tarjeta no tiene cupo usado pendiente (el usado debe ser mayor que 0).");
+        }
 
         BigDecimal newUsed = MoneyUtils.atLeastZero(MoneyUtils.subtract(card.getUsedAmount(), amount));
         card.setUsedAmount(newUsed);
