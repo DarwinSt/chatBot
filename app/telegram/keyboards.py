@@ -1,3 +1,14 @@
+def confirm_keyboard() -> dict:
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "✅ Confirmar", "callback_data": "cfm:ok"},
+                {"text": "❌ Cancelar", "callback_data": "cfm:cancel"},
+            ]
+        ]
+    }
+
+
 def main_menu_keyboard() -> dict:
     return {
         "inline_keyboard": [

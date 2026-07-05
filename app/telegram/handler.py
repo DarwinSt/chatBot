@@ -86,6 +86,11 @@ class UpdateHandler:
             if not chat_id:
                 return
             session = self.sessions.get_or_create(chat_id)
+
+            if data.startswith("cfm:"):
+                self.conversation.handle_confirm(chat_id, data.split(":", 1)[1])
+                return
+
             if data != "menu:cancel" and session.state == "CONVERSATION":
                 self.sessions.reset(session)
 
