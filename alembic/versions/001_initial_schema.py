@@ -23,10 +23,26 @@ debt_status = postgresql.ENUM("ACTIVA", "PAGADA", "VENCIDA", "CANCELADA", name="
 
 
 def upgrade() -> None:
-    op.execute("CREATE TYPE account_type AS ENUM ('CORRIENTE', 'AHORROS', 'EFECTIVO', 'BILLETERA_DIGITAL')")
-    op.execute("CREATE TYPE category_type AS ENUM ('INGRESO', 'GASTO', 'DEUDA')")
-    op.execute("CREATE TYPE debt_direction AS ENUM ('POR_PAGAR', 'POR_COBRAR')")
-    op.execute("CREATE TYPE debt_status AS ENUM ('ACTIVA', 'PAGADA', 'VENCIDA', 'CANCELADA')")
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE account_type AS ENUM ('CORRIENTE', 'AHORROS', 'EFECTIVO', 'BILLETERA_DIGITAL');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE category_type AS ENUM ('INGRESO', 'GASTO', 'DEUDA');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE debt_direction AS ENUM ('POR_PAGAR', 'POR_COBRAR');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE debt_status AS ENUM ('ACTIVA', 'PAGADA', 'VENCIDA', 'CANCELADA');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$
+    """)
 
     op.create_table(
         "accounts",
