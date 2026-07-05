@@ -77,52 +77,56 @@ class UpdateHandler:
             self.client.send_message(chat_id, "Comando no reconocido. Usa /menu.")
 
     def _handle_callback(self, callback: dict) -> None:
-        message = callback.get("message") or {}
-        chat_id = (message.get("chat") or {}).get("id")
-        data = (callback.get("data") or "").strip()
-        if not chat_id:
-            return
-        session = self.sessions.get_or_create(chat_id)
-        if data != "menu:cancel" and session.state == "CONVERSATION":
-            self.sessions.reset(session)
+        callback_id = callback.get("id")
+        try:
+            message = callback.get("message") or {}
+            chat_id = (message.get("chat") or {}).get("id")
+            data = (callback.get("data") or "").strip()
+            if not chat_id:
+                return
+            session = self.sessions.get_or_create(chat_id)
+            if data != "menu:cancel" and session.state == "CONVERSATION":
+                self.sessions.reset(session)
 
-        if data == "menu:main":
-            self.send_main_menu(chat_id)
-        elif data == "menu:movements":
-            self.client.send_message(chat_id, "Movimientos:", movements_menu_keyboard())
-        elif data == "menu:accounts":
-            self.client.send_message(chat_id, "Cuentas:", accounts_menu_keyboard())
-        elif data == "menu:cancel":
-            self.sessions.reset(session)
-            self.send_main_menu(chat_id)
-        elif data == "debts:payable":
-            self._show_debts(chat_id, DebtDirection.POR_PAGAR)
-        elif data == "debts:receivable":
-            self._show_debts(chat_id, DebtDirection.POR_COBRAR)
-        elif data == "debts:summary":
-            self.client.send_message(chat_id, self.quick.debt_summary())
-        elif data == "action:balance":
-            self.client.send_message(chat_id, self.quick.balance())
-        elif data == "action:view_accounts":
-            self.client.send_message(chat_id, "Cuentas:\n" + self.quick.format_accounts(self.accounts.list_active()))
-        elif data == "action:account_create":
-            self._start_account_create(chat_id)
-        elif data == "action:expense":
-            self._start_expense(chat_id)
-        elif data == "action:income":
-            self._start_income(chat_id)
-        elif data == "action:debt_payable":
-            self._start_debt_register(chat_id, DebtDirection.POR_PAGAR)
-        elif data == "action:debt_receivable":
-            self._start_debt_register(chat_id, DebtDirection.POR_COBRAR)
-        elif data == "action:debt_pay":
-            self._start_debt_movement(chat_id, DebtDirection.POR_PAGAR)
-        elif data == "action:debt_collect":
-            self._start_debt_movement(chat_id, DebtDirection.POR_COBRAR)
-        elif data == "action:debt_detail":
-            self._start_debt_detail(chat_id)
-        elif data == "action:debt_edit":
-            self._start_debt_edit(chat_id)
+            if data == "menu:main":
+                self.send_main_menu(chat_id)
+            elif data == "menu:movements":
+                self.client.send_message(chat_id, "Movimientos:", movements_menu_keyboard())
+            elif data == "menu:accounts":
+                self.client.send_message(chat_id, "Cuentas:", accounts_menu_keyboard())
+            elif data == "menu:cancel":
+                self.sessions.reset(session)
+                self.send_main_menu(chat_id)
+            elif data == "debts:payable":
+                self._show_debts(chat_id, DebtDirection.POR_PAGAR)
+            elif data == "debts:receivable":
+                self._show_debts(chat_id, DebtDirection.POR_COBRAR)
+            elif data == "debts:summary":
+                self.client.send_message(chat_id, self.quick.debt_summary())
+            elif data == "action:balance":
+                self.client.send_message(chat_id, self.quick.balance())
+            elif data == "action:view_accounts":
+                self.client.send_message(chat_id, "Cuentas:\n" + self.quick.format_accounts(self.accounts.list_active()))
+            elif data == "action:account_create":
+                self._start_account_create(chat_id)
+            elif data == "action:expense":
+                self._start_expense(chat_id)
+            elif data == "action:income":
+                self._start_income(chat_id)
+            elif data == "action:debt_payable":
+                self._start_debt_register(chat_id, DebtDirection.POR_PAGAR)
+            elif data == "action:debt_receivable":
+                self._start_debt_register(chat_id, DebtDirection.POR_COBRAR)
+            elif data == "action:debt_pay":
+                self._start_debt_movement(chat_id, DebtDirection.POR_PAGAR)
+            elif data == "action:debt_collect":
+                self._start_debt_movement(chat_id, DebtDirection.POR_COBRAR)
+            elif data == "action:debt_detail":
+                self._start_debt_detail(chat_id)
+            elif data == "action:debt_edit":
+                self._start_debt_edit(chat_id)
+        finally:
+            self.client.answer_callback_query(callback_id or "")
 
     def send_main_menu(self, chat_id: int) -> None:
         self.client.send_message(chat_id, self.WELCOME + "\n\nMenú principal:", main_menu_keyboard())
@@ -168,9 +172,6 @@ class UpdateHandler:
         debts = DebtService(self.db).list_active(direction)
         if not debts:
             self.client.send_message(chat_id, "No hay deudas activas para esta acción.")
-            return
-        if not self.accounts.list_active():
-            self.client.send_message(chat_id, "Crea una cuenta primero.")
             return
         session = self.sessions.get_or_create(chat_id)
         ctx = FlowContext(flow="debt_movement", step="debt", fields={"direction": direction.value})

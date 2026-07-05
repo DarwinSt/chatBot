@@ -25,6 +25,19 @@ class TelegramClient:
             response = client.post(f"{self._base}/sendMessage", json=payload)
             response.raise_for_status()
 
+    def answer_callback_query(self, callback_query_id: str, text: str | None = None) -> None:
+        if not self._token or not callback_query_id:
+            return
+        payload: dict[str, Any] = {"callback_query_id": callback_query_id}
+        if text:
+            payload["text"] = text
+        try:
+            with httpx.Client(timeout=30) as client:
+                response = client.post(f"{self._base}/answerCallbackQuery", json=payload)
+                response.raise_for_status()
+        except Exception:
+            logger.exception("No se pudo responder callback_query %s", callback_query_id)
+
     def register_webhook(self, url: str, secret: str | None = None) -> None:
         if not self._token:
             return

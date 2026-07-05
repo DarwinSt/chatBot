@@ -126,7 +126,7 @@ class DebtService:
         self,
         debt_id: int,
         amount: Decimal,
-        account_id: int,
+        account_id: int | None = None,
         payment_date: date | None = None,
         notes: str | None = None,
     ) -> DebtPayment:
@@ -138,14 +138,14 @@ class DebtService:
         if move > debt.pending_amount:
             raise BusinessError("El monto supera el saldo pendiente")
 
-        account = self.accounts.get(account_id)
-        if not account.active:
-            raise BusinessError("La cuenta no está activa")
-
-        if debt.direction == DebtDirection.POR_PAGAR:
-            self.accounts.debit(account, move)
-        else:
-            self.accounts.credit(account, move)
+        if account_id is not None:
+            account = self.accounts.get(account_id)
+            if not account.active:
+                raise BusinessError("La cuenta no está activa")
+            if debt.direction == DebtDirection.POR_PAGAR:
+                self.accounts.debit(account, move)
+            else:
+                self.accounts.credit(account, move)
 
         debt.pending_amount = normalize(debt.pending_amount - move)
         if debt.pending_amount == 0:
@@ -155,7 +155,7 @@ class DebtService:
             amount=move,
             payment_date=payment_date or date.today(),
             notes=notes,
-            account_id=account.id,
+            account_id=account_id,
             debt_id=debt.id,
         )
         self.db.add(payment)

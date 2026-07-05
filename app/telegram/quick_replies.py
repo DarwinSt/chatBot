@@ -60,9 +60,12 @@ class QuickReplies:
         if debt.payments:
             lines.append("\nMovimientos:")
             for idx, payment in enumerate(debt.payments, start=1):
+                if payment.account_id:
+                    account_note = f"(cuenta #{payment.account_id})"
+                else:
+                    account_note = "(sin cuenta)"
                 lines.append(
-                    f"{idx}) {payment.payment_date} — {fmt_money(payment.amount)} "
-                    f"(cuenta #{payment.account_id})"
+                    f"{idx}) {payment.payment_date} — {fmt_money(payment.amount)} {account_note}"
                 )
         else:
             lines.append("\n(Sin movimientos registrados)")

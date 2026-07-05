@@ -15,7 +15,7 @@ class DebtPayment(Base, TimestampMixin):
     amount: Mapped[Decimal] = mapped_column(Numeric(19, 2), nullable=False)
     payment_date: Mapped[date] = mapped_column(Date, nullable=False)
     notes: Mapped[str | None] = mapped_column(String(500))
-    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id"))
     debt_id: Mapped[int] = mapped_column(ForeignKey("debts.id"), nullable=False)
 
     account = relationship("Account", back_populates="debt_payments")

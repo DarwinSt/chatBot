@@ -261,20 +261,31 @@ class ConversationService:
             self.sessions.save_context(session, "CONVERSATION", ctx)
             accs = self.accounts.list_active()
             label = "Cuenta origen" if direction == DebtDirection.POR_PAGAR else "Cuenta destino"
-            self.client.send_message(chat_id, f"{label} (número):\n" + self.quick.format_accounts(accs))
+            self.client.send_message(
+                chat_id,
+                f"{label} (número) o '-' sin cuenta:\n" + self.quick.format_accounts(accs),
+            )
         elif ctx.step == "account":
-            accs = self.accounts.list_active()
-            idx = self._parse_index(text, len(accs))
-            if idx is None:
-                self.client.send_message(chat_id, "Número inválido.")
-                return
+            account_id = None
+            if text != "-":
+                accs = self.accounts.list_active()
+                if not accs:
+                    self.client.send_message(chat_id, "No hay cuentas. Usa '-' para registrar sin cuenta.")
+                    return
+                idx = self._parse_index(text, len(accs))
+                if idx is None:
+                    self.client.send_message(chat_id, "Número inválido. Usa el número de cuenta o '-'.")
+                    return
+                account_id = accs[idx].id
             self.debts.register_movement(
                 debt_id=int(ctx.fields["debt_id"]),
                 amount=parse_amount(ctx.fields["amount"]),
-                account_id=accs[idx].id,
+                account_id=account_id,
             )
             self.sessions.reset(session)
             msg = "Abono registrado." if direction == DebtDirection.POR_PAGAR else "Cobro registrado."
+            if account_id is None:
+                msg += " (sin movimiento en cuenta)"
             self.client.send_message(chat_id, msg)
 
   # --- debt detail ---
