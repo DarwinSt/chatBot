@@ -1,0 +1,25 @@
+databases:
+  - name: financebot-db
+    plan: free
+    databaseName: financebot
+    user: financebot
+
+services:
+  - type: web
+    name: financebot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: financebot-db
+          property: connectionString
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
