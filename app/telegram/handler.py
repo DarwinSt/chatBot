@@ -68,6 +68,7 @@ class UpdateHandler:
             "/debo": lambda cid: self._show_debts(cid, DebtDirection.POR_PAGAR),
             "/me_deben": lambda cid: self._show_debts(cid, DebtDirection.POR_COBRAR),
             "/resumen_deudas": lambda cid: self.client.send_message(cid, self.quick.debt_summary()),
+            "/editar_deuda": self._start_debt_edit,
         }
         handler = routes.get(cmd)
         if handler:
@@ -120,6 +121,8 @@ class UpdateHandler:
             self._start_debt_movement(chat_id, DebtDirection.POR_COBRAR)
         elif data == "action:debt_detail":
             self._start_debt_detail(chat_id)
+        elif data == "action:debt_edit":
+            self._start_debt_edit(chat_id)
 
     def send_main_menu(self, chat_id: int) -> None:
         self.client.send_message(chat_id, self.WELCOME + "\n\nMenú principal:", main_menu_keyboard())
@@ -192,3 +195,23 @@ class UpdateHandler:
             tag = "DEBO" if d.direction == DebtDirection.POR_PAGAR else "ME DEBEN"
             lines.append(f"{i}) [{tag}] {d.name} — pend. {d.pending_amount}")
         self.client.send_message(chat_id, "Elige deuda por número:\n" + "\n".join(lines))
+
+    def _start_debt_edit(self, chat_id: int) -> None:
+        from app.services.debt_service import DebtService
+
+        debts = DebtService(self.db).list_active()
+        if not debts:
+            self.client.send_message(chat_id, "No hay deudas activas para editar.")
+            return
+        session = self.sessions.get_or_create(chat_id)
+        ctx = FlowContext(flow="debt_edit", step="debt")
+        self.sessions.save_context(session, "CONVERSATION", ctx)
+        lines = []
+        for i, d in enumerate(debts, start=1):
+            tag = "DEBO" if d.direction == DebtDirection.POR_PAGAR else "ME DEBEN"
+            party = d.counterparty or "(sin contraparte)"
+            lines.append(f"{i}) [{tag}] {d.name} — {party}")
+        self.client.send_message(
+            chat_id,
+            "Editar deuda — elige por número:\n" + "\n".join(lines),
+        )

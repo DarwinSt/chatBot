@@ -56,4 +56,4 @@ Health: `GET http://localhost:8000/health`
 
 ## Comandos Telegram
 
-`/start` `/menu` `/cancelar` `/balance` `/debo` `/me_deben` `/resumen_deudas` `/ver_cuentas` `/registrar_gasto` `/registrar_ingreso` `/cuenta_crear`
+`/start` `/menu` `/cancelar` `/balance` `/debo` `/me_deben` `/resumen_deudas` `/editar_deuda` `/ver_cuentas` `/registrar_gasto` `/registrar_ingreso` `/cuenta_crear`

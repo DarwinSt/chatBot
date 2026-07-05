@@ -90,6 +90,38 @@ class DebtService:
             raise NotFoundError("Deuda no encontrada")
         return self._sync_overdue(debt)
 
+    def get(self, debt_id: int) -> Debt:
+        debt = self.db.get(Debt, debt_id)
+        if not debt:
+            raise NotFoundError("Deuda no encontrada")
+        return self._sync_overdue(debt)
+
+    def update(
+        self,
+        debt_id: int,
+        *,
+        name: str,
+        counterparty: str | None,
+        notes: str | None,
+        due_date: date | None,
+    ) -> Debt:
+        debt = self.get(debt_id)
+        if debt.status in (DebtStatus.PAGADA, DebtStatus.CANCELADA):
+            raise BusinessError("No se puede editar una deuda en estado " + debt.status.value)
+
+        clean_name = name.strip()
+        if not clean_name:
+            raise BusinessError("El nombre no puede estar vacío")
+
+        debt.name = clean_name
+        debt.counterparty = counterparty.strip() if counterparty and counterparty.strip() else None
+        debt.notes = notes.strip() if notes and notes.strip() else None
+        debt.due_date = due_date
+
+        self.db.commit()
+        self.db.refresh(debt)
+        return self._sync_overdue(debt)
+
     def register_movement(
         self,
         debt_id: int,

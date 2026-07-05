@@ -35,8 +35,9 @@ def movements_menu_keyboard() -> dict:
             ],
             [
                 {"text": "🔍 Detalle deuda", "callback_data": "action:debt_detail"},
-                {"text": "⬅️ Menú", "callback_data": "menu:main"},
+                {"text": "✏️ Editar deuda", "callback_data": "action:debt_edit"},
             ],
+            [{"text": "⬅️ Menú", "callback_data": "menu:main"}],
         ]
     }
 

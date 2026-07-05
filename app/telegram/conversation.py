@@ -290,6 +290,96 @@ class ConversationService:
         self.sessions.reset(session)
         self.client.send_message(chat_id, self.quick.debt_detail(debt))
 
+  # --- debt edit ---
+    def _flow_debt_edit(self, chat_id, session, ctx, text):
+        debts = self.debts.list_active()
+        if ctx.step == "debt":
+            idx = self._parse_index(text, len(debts))
+            if idx is None:
+                self.client.send_message(chat_id, "Número inválido.")
+                return
+            selected = debts[idx]
+            ctx.fields["debt_id"] = str(selected.id)
+            ctx.fields["name"] = selected.name
+            ctx.fields["counterparty"] = selected.counterparty or ""
+            ctx.fields["notes"] = selected.notes or ""
+            ctx.fields["due"] = selected.due_date.isoformat() if selected.due_date else ""
+            ctx.fields["direction"] = selected.direction.value
+            ctx.step = "name"
+            self.sessions.save_context(session, "CONVERSATION", ctx)
+            party_label = "Acreedor" if selected.direction == DebtDirection.POR_PAGAR else "Deudor"
+            self.client.send_message(
+                chat_id,
+                f"Referencia actual: {selected.name}\n"
+                f"{party_label} actual: {selected.counterparty or '(sin registrar)'}\n\n"
+                "Nuevo nombre/referencia (o '-' para mantener):",
+            )
+        elif ctx.step == "name":
+            if text != "-":
+                ctx.fields["name"] = text.strip()
+            ctx.step = "counterparty"
+            self.sessions.save_context(session, "CONVERSATION", ctx)
+            party_label = "Acreedor" if ctx.fields["direction"] == DebtDirection.POR_PAGAR.value else "Deudor"
+            current = ctx.fields.get("counterparty") or "(sin registrar)"
+            self.client.send_message(
+                chat_id,
+                f"Nuevo {party_label.lower()} (o '-' para mantener):\nActual: {current}",
+            )
+        elif ctx.step == "counterparty":
+            if text == "-":
+                pass
+            elif text == "0":
+                ctx.fields["counterparty"] = ""
+            else:
+                ctx.fields["counterparty"] = text.strip()
+            ctx.step = "notes"
+            self.sessions.save_context(session, "CONVERSATION", ctx)
+            current = ctx.fields.get("notes") or "(sin notas)"
+            self.client.send_message(
+                chat_id,
+                f"Nuevas notas/descripción (o '-' mantener, '0' limpiar):\nActual: {current}",
+            )
+        elif ctx.step == "notes":
+            if text == "-":
+                pass
+            elif text == "0":
+                ctx.fields["notes"] = ""
+            else:
+                ctx.fields["notes"] = text.strip()
+            ctx.step = "due"
+            self.sessions.save_context(session, "CONVERSATION", ctx)
+            current = ctx.fields.get("due") or "(sin vencimiento)"
+            self.client.send_message(
+                chat_id,
+                f"Nueva fecha de vencimiento YYYY-MM-DD (o '-' mantener, '0' limpiar):\nActual: {current}",
+            )
+        elif ctx.step == "due":
+            if text == "-":
+                due = date.fromisoformat(ctx.fields["due"]) if ctx.fields.get("due") else None
+            elif text == "0":
+                due = None
+            else:
+                due = self._parse_date(text)
+                if due is None:
+                    self.client.send_message(chat_id, "Fecha inválida. Usa YYYY-MM-DD.")
+                    return
+            updated = self.debts.update(
+                int(ctx.fields["debt_id"]),
+                name=ctx.fields["name"],
+                counterparty=ctx.fields.get("counterparty") or None,
+                notes=ctx.fields.get("notes") or None,
+                due_date=due,
+            )
+            self.sessions.reset(session)
+            party_label = "Acreedor" if updated.direction == DebtDirection.POR_PAGAR else "Deudor"
+            self.client.send_message(
+                chat_id,
+                "Deuda actualizada:\n"
+                f"- Referencia: {updated.name}\n"
+                f"- {party_label}: {updated.counterparty or '(sin registrar)'}\n"
+                f"- Vence: {updated.due_date.isoformat() if updated.due_date else 'sin fecha'}",
+            )
+
     @staticmethod
     def _format_categories(categories) -> str:
         return "\n".join(f"{i}) {c.name}" for i, c in enumerate(categories, start=1))
