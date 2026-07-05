@@ -69,6 +69,7 @@ class UpdateHandler:
             "/me_deben": lambda cid: self._show_debts(cid, DebtDirection.POR_COBRAR),
             "/resumen_deudas": lambda cid: self.client.send_message(cid, self.quick.debt_summary()),
             "/editar_deuda": self._start_debt_edit,
+            "/agregar_deuda": self._start_debt_add,
         }
         handler = routes.get(cmd)
         if handler:
@@ -125,6 +126,8 @@ class UpdateHandler:
                 self._start_debt_detail(chat_id)
             elif data == "action:debt_edit":
                 self._start_debt_edit(chat_id)
+            elif data == "action:debt_add":
+                self._start_debt_add(chat_id)
         finally:
             self.client.answer_callback_query(callback_id or "")
 
@@ -215,4 +218,25 @@ class UpdateHandler:
         self.client.send_message(
             chat_id,
             "Editar deuda — elige por número:\n" + "\n".join(lines),
+        )
+
+    def _start_debt_add(self, chat_id: int) -> None:
+        from app.services.debt_service import DebtService
+
+        debts = DebtService(self.db).list_active()
+        if not debts:
+            self.client.send_message(chat_id, "No hay deudas activas.")
+            return
+        session = self.sessions.get_or_create(chat_id)
+        ctx = FlowContext(flow="debt_add", step="debt")
+        self.sessions.save_context(session, "CONVERSATION", ctx)
+        lines = []
+        for i, d in enumerate(debts, start=1):
+            tag = "DEBO" if d.direction == DebtDirection.POR_PAGAR else "ME DEBEN"
+            lines.append(
+                f"{i}) [{tag}] {d.name} — total {d.total_amount}, pend. {d.pending_amount}"
+            )
+        self.client.send_message(
+            chat_id,
+            "Agregar monto a deuda existente — elige por número:\n" + "\n".join(lines),
         )

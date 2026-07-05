@@ -11,7 +11,7 @@ from app.services.income_service import IncomeService
 from app.telegram.client import TelegramClient
 from app.telegram.quick_replies import QuickReplies
 from app.telegram.session import FlowContext, SessionService
-from app.utils.money import parse_amount
+from app.utils.money import fmt_money, parse_amount
 
 
 class ConversationService:
@@ -257,6 +257,22 @@ class ConversationService:
                 self.client.send_message(chat_id, "Monto inválido.")
                 return
             ctx.fields["amount"] = str(amount)
+            ctx.step = "payment_date"
+            self.sessions.save_context(session, "CONVERSATION", ctx)
+            verb = "abono" if direction == DebtDirection.POR_PAGAR else "cobro"
+            self.client.send_message(
+                chat_id,
+                f"Fecha del {verb} (YYYY-MM-DD) o '-' para hoy:",
+            )
+        elif ctx.step == "payment_date":
+            if text == "-":
+                payment_date = date.today()
+            else:
+                payment_date = self._parse_date(text)
+                if payment_date is None:
+                    self.client.send_message(chat_id, "Fecha inválida. Usa YYYY-MM-DD o '-'.")
+                    return
+            ctx.fields["payment_date"] = payment_date.isoformat()
             ctx.step = "account"
             self.sessions.save_context(session, "CONVERSATION", ctx)
             accs = self.accounts.list_active()
@@ -281,12 +297,47 @@ class ConversationService:
                 debt_id=int(ctx.fields["debt_id"]),
                 amount=parse_amount(ctx.fields["amount"]),
                 account_id=account_id,
+                payment_date=date.fromisoformat(ctx.fields["payment_date"]),
             )
             self.sessions.reset(session)
             msg = "Abono registrado." if direction == DebtDirection.POR_PAGAR else "Cobro registrado."
             if account_id is None:
                 msg += " (sin movimiento en cuenta)"
+            msg += f"\nFecha: {ctx.fields['payment_date']}"
             self.client.send_message(chat_id, msg)
+
+  # --- debt add amount ---
+    def _flow_debt_add(self, chat_id, session, ctx, text):
+        debts = self.debts.list_active()
+        if ctx.step == "debt":
+            idx = self._parse_index(text, len(debts))
+            if idx is None:
+                self.client.send_message(chat_id, "Número inválido.")
+                return
+            selected = debts[idx]
+            ctx.fields["debt_id"] = str(selected.id)
+            ctx.step = "amount"
+            self.sessions.save_context(session, "CONVERSATION", ctx)
+            self.client.send_message(
+                chat_id,
+                f"Deuda: {selected.name}\n"
+                f"Total actual: {fmt_money(selected.total_amount)} | "
+                f"Pendiente: {fmt_money(selected.pending_amount)}\n\n"
+                "Monto a agregar:",
+            )
+        elif ctx.step == "amount":
+            amount = parse_amount(text)
+            if amount is None:
+                self.client.send_message(chat_id, "Monto inválido.")
+                return
+            updated = self.debts.add_amount(int(ctx.fields["debt_id"]), amount)
+            self.sessions.reset(session)
+            self.client.send_message(
+                chat_id,
+                "Monto agregado a la deuda.\n"
+                f"- Total: {fmt_money(updated.total_amount)}\n"
+                f"- Pendiente: {fmt_money(updated.pending_amount)}",
+            )
 
   # --- debt detail ---
     def _flow_debt_detail(self, chat_id, session, ctx, text):

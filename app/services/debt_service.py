@@ -122,6 +122,24 @@ class DebtService:
         self.db.refresh(debt)
         return self._sync_overdue(debt)
 
+    def add_amount(self, debt_id: int, amount: Decimal) -> Debt:
+        debt = self.get(debt_id)
+        if debt.status == DebtStatus.CANCELADA:
+            raise BusinessError("No se puede agregar monto a una deuda cancelada")
+
+        extra = normalize(amount)
+        if extra <= 0:
+            raise BusinessError("El monto a agregar debe ser mayor a cero")
+
+        debt.total_amount = normalize(debt.total_amount + extra)
+        debt.pending_amount = normalize(debt.pending_amount + extra)
+        if debt.status == DebtStatus.PAGADA:
+            debt.status = DebtStatus.ACTIVA
+
+        self.db.commit()
+        self.db.refresh(debt)
+        return self._sync_overdue(debt)
+
     def register_movement(
         self,
         debt_id: int,

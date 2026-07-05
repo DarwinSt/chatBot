@@ -34,10 +34,13 @@ def movements_menu_keyboard() -> dict:
                 {"text": "💵 Registrar cobro", "callback_data": "action:debt_collect"},
             ],
             [
+                {"text": "➕ Agregar a deuda", "callback_data": "action:debt_add"},
                 {"text": "🔍 Detalle deuda", "callback_data": "action:debt_detail"},
-                {"text": "✏️ Editar deuda", "callback_data": "action:debt_edit"},
             ],
-            [{"text": "⬅️ Menú", "callback_data": "menu:main"}],
+            [
+                {"text": "✏️ Editar deuda", "callback_data": "action:debt_edit"},
+                {"text": "⬅️ Menú", "callback_data": "menu:main"},
+            ],
         ]
     }
 
